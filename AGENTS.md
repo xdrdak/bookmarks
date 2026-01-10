@@ -1,0 +1,105 @@
+# Agent Instructions
+
+This repository is a TypeScript/Node.js bookmarks tracking application using LLM-generated notes and tags.
+
+## Code Quality Expectations
+
+This codebase will outlive you. Every shortcut you take becomes someone else's burden. Every hack compounds into technical debt that slows the whole team down.
+
+You are not just writing code. You are shaping the future of this project. The patterns you establish will be copied. The corners you cut will be cut again.
+
+Fight entropy. Leave the codebase better than you found it.
+
+## Available Commands
+
+### Core Commands
+
+- `npm run start` - Run the main application (executes src/index.ts)
+- `npm run lint` - Lint code with oxlint
+- `npm run format` - Format code with oxfmt
+- `npm run format:check` - Check code formatting without changes
+
+### Testing
+
+- `npm test` - Run all tests with vitest
+- `npx vitest run` - Run all tests once (no watch mode)
+- Run a single test file: `npx vitest run <test-file>`
+- Run in watch mode: `npx vitest <test-file>`
+
+## Code Style Guidelines
+
+### TypeScript Configuration
+
+- Strict mode is enabled (tsconfig:23)
+- Additional strict checks: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
+- Target: ESNext with Node.js module resolution
+- All unused locals/parameters must be removed
+
+### Type Safety
+
+- Always use strict typing - no `any` or type assertions without clear reason
+- Leverage `noUncheckedIndexedAccess` - check array/object access for undefined
+- Use `exactOptionalPropertyTypes` - don't add undefined to optional props explicitly
+- Define interfaces/types for data structures
+- Return types should be explicit on exported functions
+
+### Imports
+
+- Use ES modules (`import`/`export`)
+- `verbatimModuleSyntax` means type-only imports use `import type`
+- Order: external dependencies, internal modules, relative imports
+- Group imports and separate with blank lines between groups
+
+### Formatting (oxfmt)
+
+- Let oxfmt handle indentation and line length
+- Run `npm run format` before committing
+- CI will check formatting with `npm run format:check`
+
+### Linting (oxlint)
+
+- Run `npm run lint` to check for issues
+- Fix all linting errors before committing
+- Focus on code quality and potential bugs
+
+### Naming Conventions
+
+- PascalCase for classes, interfaces, types, enums
+- camelCase for variables, functions, methods, properties
+- UPPER_SNAKE_CASE for constants
+- Use descriptive, meaningful names
+
+### Error Handling
+
+- Use try/catch for async operations that may fail
+- Prefer explicit error types over generic Error
+- Log errors appropriately for debugging
+- Consider custom error types for domain-specific failures
+
+### Code Organization
+
+- Keep files focused and small (<300 lines preferred)
+- One module/class per file
+- Use clear file names matching exports
+- Group related functionality in directories
+
+### Comments
+
+- Comments should explain WHY, not WHAT
+- Prefer self-documenting code over comments
+- Use JSDoc for exported function documentation
+- No inline comments for obvious code
+
+### Node.js Specifics
+
+- Use async/await over callbacks
+- Handle promises properly (always await or .catch)
+- Use modern Node.js APIs available in Node 24
+- Consider performance for I/O operations
+
+## Before Submitting Changes
+
+1. Run `npm run lint` and fix all issues
+2. Run `npm run format` to ensure consistent formatting
+3. Run tests when implemented
+4. Verify TypeScript compilation succeeds
