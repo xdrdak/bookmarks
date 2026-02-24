@@ -24,11 +24,6 @@ export const mainCommand = defineCommand({
     help: helpCommand,
     download: downloadCommand,
   },
-  run: async () => {
-    // When run without subcommand, show help
-    const { showUsage } = await import("citty");
-    await showUsage(mainCommand);
-  },
 });
 
 export function run(): Promise<void> {

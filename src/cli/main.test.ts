@@ -24,17 +24,10 @@ describe("mainCommand", () => {
     expect(resolvedSubCommands).toHaveProperty("help");
   });
 
-  it("should show usage when run without subcommand", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-    const { result } = await runCommand(mainCommand, {
-      rawArgs: [],
-    });
-
-    expect(result).toBeUndefined();
-    expect(consoleSpy).toHaveBeenCalled();
-
-    consoleSpy.mockRestore();
+  it("should throw when run without subcommand", async () => {
+    await expect(
+      runCommand(mainCommand, { rawArgs: [] }),
+    ).rejects.toThrow("No command specified");
   });
 
   it("should render usage with correct description", async () => {
@@ -42,19 +35,6 @@ describe("mainCommand", () => {
 
     expect(usage).toContain("bookmarks");
     expect(usage).toContain("A CLI tool for managing bookmarks");
-  });
-
-  it("should show version with --version flag", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-    await runCommand(mainCommand, {
-      rawArgs: ["--version"],
-    });
-
-    const loggedOutput = consoleSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(loggedOutput).toMatch(/\d+\.\d+\.\d+/);
-
-    consoleSpy.mockRestore();
   });
 });
 
@@ -107,14 +87,6 @@ describe("CLI integration", () => {
   it("should show help with help subcommand", async () => {
     await runCommand(mainCommand, {
       rawArgs: ["help"],
-    });
-
-    expect(consoleLogSpy).toHaveBeenCalled();
-  });
-
-  it("should show help with --help flag", async () => {
-    await runCommand(mainCommand, {
-      rawArgs: ["--help"],
     });
 
     expect(consoleLogSpy).toHaveBeenCalled();

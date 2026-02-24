@@ -166,13 +166,14 @@ describe("downloadCommand", () => {
       statusText: "Not Found",
     });
 
+    const outputPath = join(testDir, "http-error-test.csv");
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
     });
 
     await expect(
-      runCommand(downloadCommand, { rawArgs: [] }),
+      runCommand(downloadCommand, { rawArgs: ["--output", outputPath] }),
     ).rejects.toThrow("process.exit");
 
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -219,13 +220,14 @@ describe("downloadCommand", () => {
 
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
+    const outputPath = join(testDir, "network-error-test.csv");
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
     });
 
     await expect(
-      runCommand(downloadCommand, { rawArgs: [] }),
+      runCommand(downloadCommand, { rawArgs: ["--output", outputPath] }),
     ).rejects.toThrow("process.exit");
 
     expect(consoleSpy).toHaveBeenCalledWith(
