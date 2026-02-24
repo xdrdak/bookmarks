@@ -2,30 +2,6 @@
 
 This repository is a TypeScript/Node.js bookmarks tracking application using LLM-generated notes and tags.
 
-## Code Quality Expectations
-
-This codebase will outlive you. Every shortcut you take becomes someone else's burden. Every hack compounds into technical debt that slows the whole team down.
-
-You are not just writing code. You are shaping the future of this project. The patterns you establish will be copied. The corners you cut will be cut again.
-
-Fight entropy. Leave the codebase better than you found it.
-
-## Available Commands
-
-### Core Commands
-
-- `npm run start` - Run the main application (executes src/index.ts)
-- `npm run lint` - Lint code with oxlint
-- `npm run format` - Format code with oxfmt
-- `npm run format:check` - Check code formatting without changes
-
-### Testing
-
-- `npm test` - Run all tests with vitest
-- `npx vitest run` - Run all tests once (no watch mode)
-- Run a single test file: `npx vitest run <test-file>`
-- Run in watch mode: `npx vitest <test-file>`
-
 ## Code Style Guidelines
 
 ### TypeScript Configuration
@@ -68,6 +44,7 @@ Fight entropy. Leave the codebase better than you found it.
 - camelCase for variables, functions, methods, properties
 - UPPER_SNAKE_CASE for constants
 - Use descriptive, meaningful names
+- use kebab-case for all typescript files.
 
 ### Error Handling
 
@@ -103,3 +80,11 @@ Fight entropy. Leave the codebase better than you found it.
 2. Run `npm run format` to ensure consistent formatting
 3. Run tests when implemented
 4. Verify TypeScript compilation succeeds
+
+## CLI Documentation
+
+- Document all commands using the `bookmarks` keyword (e.g., `bookmarks download`, `bookmarks help`)
+- This represents the conceptual command interface, not the exact shell invocation
+- When validating, testing, or running commands locally, use: `npm start -- <command>`
+  - Example: `npm start -- download -o output.csv`
+  - The `--env-file=.env` flag is baked into the npm script

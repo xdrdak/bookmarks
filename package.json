@@ -5,13 +5,19 @@
   "description": "",
   "license": "UNLICENSED",
   "author": "xdrdak",
+  "bin": {
+    "bookmarks": "./src/bin.ts"
+  },
   "type": "module",
   "scripts": {
-    "start": "node src/index.ts",
+    "start": "node --env-file=.env src/bin.ts",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "vitest"
+  },
+  "dependencies": {
+    "citty": "^0.2.1"
   },
   "devDependencies": {
     "@types/node": "^25.0.6",
