@@ -196,7 +196,4 @@ ${content}`,
   }
 }
 
-/**
- * @deprecated Use OpenAISummarizer instead. This alias is provided for backwards compatibility.
- */
-export const LLMSummarizer = OpenAISummarizer;
+

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { OpenAISummarizer, LLMSummarizer, ErrorPageError } from "./summarizer.ts";
+import { OpenAISummarizer, ErrorPageError } from "./summarizer.ts";
 import type OpenAI from "openai";
 
 function createMockClient(responses: Array<{ content: string | null; choices?: unknown[] }> = []) {
@@ -237,12 +237,6 @@ describe("OpenAISummarizer", () => {
       // Parallel calls with different instances should not wait for each other
       expect(elapsed).toBeLessThan(80);
     });
-  });
-});
-
-describe("LLMSummarizer (backwards compatibility alias)", () => {
-  it("should be an alias for OpenAISummarizer", () => {
-    expect(LLMSummarizer).toBe(OpenAISummarizer);
   });
 });
 

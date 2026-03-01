@@ -5,7 +5,7 @@ import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { BookmarkStore } from "../../bookmarks.ts";
 import { MarkdownStore, MarkdownFile } from "../../markdown.ts";
 import { summarizeCommand } from "./summarize.ts";
-import { LLMSummarizer } from "../../summarizer.ts";
+import { OpenAISummarizer } from "../../summarizer.ts";
 
 describe("summarizeCommand", () => {
   const originalEnv = { ...process.env };
@@ -42,7 +42,7 @@ describe("summarizeCommand", () => {
 
     // Mock summarizer for fast tests
     let callCount = 0;
-    summarizeSpy = vi.spyOn(LLMSummarizer.prototype, "summarize").mockImplementation(() => {
+    summarizeSpy = vi.spyOn(OpenAISummarizer.prototype, "summarize").mockImplementation(() => {
       callCount++;
       return Promise.resolve({
         summary: `Mock summary ${callCount}`,

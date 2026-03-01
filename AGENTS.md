@@ -77,6 +77,13 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Use modern Node.js APIs available in Node 24
 - Consider performance for I/O operations
 
+### Backwards Compatibility
+
+- **No backwards compatibility needed** - this is a personal project with no external users
+- Delete deprecated code, aliases, and migration paths immediately
+- Rename/move things freely without maintaining old names
+- Breaking changes are fine - just update all usages
+
 ## Before Submitting Changes
 
 1. Run `npm run lint` and fix all issues

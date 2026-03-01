@@ -1,7 +1,7 @@
 import type { ArgsDef, CommandDef } from "citty";
 import { BookmarkStore } from "../../bookmarks.ts";
 import { MarkdownStore } from "../../markdown.ts";
-import { LLMSummarizer, ErrorPageError } from "../../summarizer.ts";
+import { OpenAISummarizer, ErrorPageError } from "../../summarizer.ts";
 
 export interface SummarizeArgs extends ArgsDef {
   url: {
@@ -136,7 +136,7 @@ async function summarizeOne(
   console.log(`Summarizing: ${url}`);
 
   // Generate summary and tags
-  const summarizer = new LLMSummarizer();
+  const summarizer = new OpenAISummarizer();
 
   let result;
   try {
@@ -178,7 +178,7 @@ async function summarizeAll(
     return;
   }
 
-  const summarizer = new LLMSummarizer();
+  const summarizer = new OpenAISummarizer();
   let summarized = 0;
   let skipped = 0;
 
