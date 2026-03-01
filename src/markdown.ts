@@ -19,12 +19,15 @@ function urlToHash(url: string): string {
  * Used to represent fetched markdown content that can be stored and retrieved.
  */
 export class MarkdownFile {
-  constructor(
-    /** The source URL this content was fetched from */
-    readonly url: string,
-    /** The markdown content */
-    readonly content: string,
-  ) {}
+  /** The source URL this content was fetched from */
+  readonly url: string;
+  /** The markdown content */
+  readonly content: string;
+
+  constructor(url: string, content: string) {
+    this.url = url;
+    this.content = content;
+  }
 }
 
 /**

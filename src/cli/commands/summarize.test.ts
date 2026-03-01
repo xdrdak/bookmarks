@@ -44,7 +44,10 @@ describe("summarizeCommand", () => {
     let callCount = 0;
     summarizeSpy = vi.spyOn(LLMSummarizer.prototype, "summarize").mockImplementation(() => {
       callCount++;
-      return Promise.resolve(`Mock summary ${callCount}`);
+      return Promise.resolve({
+        summary: `Mock summary ${callCount}`,
+        tags: [`tag-${callCount}`],
+      });
     });
 
     // Helper to add content for tests (URL -> content)
@@ -219,12 +222,13 @@ describe("summarizeCommand", () => {
       rawArgs: [url, "--store", storePath, "--contentDir", contentDir],
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Summary generated"));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Summary and tags generated"));
 
     // Verify store was updated
     const updatedStore = await BookmarkStore.load(storePath);
     const bookmark = updatedStore.get(url);
     expect(bookmark?.summary).toBe("Mock summary 1");
+    expect(bookmark?.tags).toEqual(["tag-1"]);
     expect(bookmark?.summarizedAt).toBeDefined();
 
     consoleSpy.mockRestore();

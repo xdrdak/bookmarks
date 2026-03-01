@@ -135,20 +135,22 @@ async function summarizeOne(
 
   console.log(`Summarizing: ${url}`);
 
-  // Generate summary
+  // Generate summary and tags
   const summarizer = new LLMSummarizer();
-  const summary = await summarizer.summarize(file.content);
+  const result = await summarizer.summarize(file.content);
 
   // Update store
   bookmarkStore.upsert(url, {
-    summary,
+    summary: result.summary,
+    tags: result.tags,
     summarizedAt: new Date().toISOString(),
   });
 
   await bookmarkStore.save();
 
-  console.log(`Summary generated`);
-  console.log(`\n${summary}\n`);
+  console.log(`Summary and tags generated`);
+  console.log(`\nSummary:\n${result.summary}`);
+  console.log(`\nTags: ${result.tags.join(", ")}\n`);
 }
 
 async function summarizeAll(
@@ -183,12 +185,13 @@ async function summarizeAll(
 
       console.log(`Summarizing: ${bookmark.url}`);
 
-      // Generate summary
-      const summary = await summarizer.summarize(file.content);
+      // Generate summary and tags
+      const result = await summarizer.summarize(file.content);
 
       // Update store
       bookmarkStore.upsert(bookmark.url, {
-        summary,
+        summary: result.summary,
+        tags: result.tags,
         summarizedAt: new Date().toISOString(),
       });
 

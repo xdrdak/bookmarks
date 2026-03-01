@@ -1,5 +1,11 @@
 import { defineCommand, runMain } from "citty";
-import { helpCommand, syncCommand, summarizeCommand, fetchCommand } from "./commands/index.ts";
+import {
+  helpCommand,
+  syncCommand,
+  summarizeCommand,
+  fetchCommand,
+  processCommand,
+} from "./commands/index.ts";
 
 import { readFileSync } from "node:fs";
 
@@ -25,6 +31,7 @@ export const mainCommand = defineCommand({
     sync: syncCommand,
     summarize: summarizeCommand,
     fetch: fetchCommand,
+    process: processCommand,
   },
 });
 

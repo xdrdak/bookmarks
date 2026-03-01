@@ -14,8 +14,11 @@ describe("LLMSummarizer", () => {
   });
 
   describe("summarize", () => {
-    it("should generate summary from content", async () => {
-      const mockSummary = "This is a summary of the content.";
+    it("should generate summary and tags from content", async () => {
+      const mockResponse = JSON.stringify({
+        summary: "This is a summary of the content.",
+        tags: ["technology", "ai"],
+      });
       const content = "Long article content here...";
 
       vi.spyOn(global, "fetch").mockResolvedValue({
@@ -24,7 +27,7 @@ describe("LLMSummarizer", () => {
           candidates: [
             {
               content: {
-                parts: [{ text: mockSummary }],
+                parts: [{ text: mockResponse }],
               },
             },
           ],
@@ -34,7 +37,8 @@ describe("LLMSummarizer", () => {
       const summarizer = new LLMSummarizer();
       const result = await summarizer.summarize(content);
 
-      expect(result).toBe(mockSummary);
+      expect(result.summary).toBe("This is a summary of the content.");
+      expect(result.tags).toEqual(["technology", "ai"]);
 
       // Verify API call structure
       expect(global.fetch).toHaveBeenCalledWith(
@@ -52,7 +56,7 @@ describe("LLMSummarizer", () => {
       vi.spyOn(global, "fetch").mockResolvedValue({
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: "summary" }] } }],
+          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
         }),
       } as Response);
 
@@ -87,7 +91,7 @@ describe("LLMSummarizer", () => {
       );
     });
 
-    it("should throw if no summary generated", async () => {
+    it("should throw if no response generated", async () => {
       vi.spyOn(global, "fetch").mockResolvedValue({
         ok: true,
         json: async () => ({ candidates: [] }),
@@ -95,7 +99,7 @@ describe("LLMSummarizer", () => {
 
       const summarizer = new LLMSummarizer();
       await expect(summarizer.summarize("content")).rejects.toThrow(
-        "No summary generated from Gemini API",
+        "No response generated from Gemini API",
       );
     });
 
@@ -105,7 +109,7 @@ describe("LLMSummarizer", () => {
       vi.spyOn(global, "fetch").mockResolvedValue({
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: "summary" }] } }],
+          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
         }),
       } as Response);
 
@@ -118,6 +122,83 @@ describe("LLMSummarizer", () => {
 
       expect(body.contents[0].parts[0].text).toContain(content);
     });
+
+    it("should parse JSON wrapped in markdown code block", async () => {
+      const mockResponse = '```json\n{"summary":"Test summary","tags":["test"]}\n```';
+
+      vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: mockResponse }] } }],
+        }),
+      } as Response);
+
+      const summarizer = new LLMSummarizer();
+      const result = await summarizer.summarize("content");
+
+      expect(result.summary).toBe("Test summary");
+      expect(result.tags).toEqual(["test"]);
+    });
+
+    it("should throw on malformed JSON", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: "not valid json" }] } }],
+        }),
+      } as Response);
+
+      const summarizer = new LLMSummarizer();
+      await expect(summarizer.summarize("content")).rejects.toThrow("Failed to parse LLM response");
+    });
+
+    it("should throw if summary is missing", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '{"tags":["test"]}' }] } }],
+        }),
+      } as Response);
+
+      const summarizer = new LLMSummarizer();
+      await expect(summarizer.summarize("content")).rejects.toThrow(
+        "Response missing 'summary' string",
+      );
+    });
+
+    it("should throw if tags is not an array", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '{"summary":"test","tags":"not-array"}' }] } }],
+        }),
+      } as Response);
+
+      const summarizer = new LLMSummarizer();
+      await expect(summarizer.summarize("content")).rejects.toThrow(
+        "Response missing 'tags' array",
+      );
+    });
+
+    it("should filter non-string tags", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '{"summary":"test","tags":["valid",123,null,"also-valid"]}' }],
+              },
+            },
+          ],
+        }),
+      } as Response);
+
+      const summarizer = new LLMSummarizer();
+      const result = await summarizer.summarize("content");
+
+      expect(result.tags).toEqual(["valid", "also-valid"]);
+    });
   });
 
   describe("rate limiting", () => {
@@ -125,7 +206,7 @@ describe("LLMSummarizer", () => {
       vi.spyOn(global, "fetch").mockResolvedValue({
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: "summary" }] } }],
+          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
         }),
       } as Response);
 
@@ -144,7 +225,7 @@ describe("LLMSummarizer", () => {
       vi.spyOn(global, "fetch").mockResolvedValue({
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: "summary" }] } }],
+          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
         }),
       } as Response);
 

@@ -11,7 +11,8 @@
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env src/bin.ts",
-    "lint": "oxlint --import-plugin -D no-commonjs",
+    "lint": "oxlint --import-plugin -D no-commonjs && npm run lint:no-param-props",
+    "lint:no-param-props": "test -z \"$(grep -rnE 'constructor\\([^)]*\\b(readonly|private|public|protected)\\s+\\w+\\s*:' src/ || true)\"",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "vitest"

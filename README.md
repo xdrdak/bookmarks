@@ -83,7 +83,7 @@ The bookmark store is a JSON file (`bookmarks.json` by default) containing a map
 }
 ```
 
-The store is managed by the `BookmarkStore` class in `src/store.ts`, which provides atomic writes and CRUD operations.
+The store is managed by the `BookmarkStore` class in `src/bookmarks.ts`, which provides atomic writes and CRUD operations.
 
 ---
 
@@ -198,10 +198,10 @@ bookmarks fetch --all --force                   # Re-fetch all bookmarks
 ### Summarize
 
 ```bash
-bookmarks summarize [URL] [options]    # Generate summaries using LLM
+bookmarks summarize [URL] [options]    # Generate summaries and tags using LLM
 ```
 
-Generates AI summaries for bookmarked pages. Requires content to be fetched first (run `bookmarks fetch`). Uses Google Gemini API.
+Generates AI summaries and tags for bookmarked pages. Requires content to be fetched first (run `bookmarks fetch`). Uses Google Gemini API with structured JSON output.
 
 | Option             | Default          | Description                          |
 | ------------------ | ---------------- | ------------------------------------ |
@@ -229,7 +229,42 @@ bookmarks summarize --all --force                 # Re-summarize everything
 - Requires `GEMINI_API_KEY` environment variable
 - Rate limited to ~15 requests/minute (Gemini free tier)
 - Skips bookmarks without fetched content
-- Stores summary, `summarizedAt`, and `summarizedWith` fields
+- Generates both `summary` and `tags` in a single LLM call
+- Stores summary, tags, and `summarizedAt` fields
+
+### Process
+
+```bash
+bookmarks process [URL] [options]    # Fetch and summarize in one command
+```
+
+Convenience command that chains fetch and summarize operations. For single URLs, fetches content then summarizes. Without a URL, processes all bookmarks that need fetching and/or summarizing.
+
+| Option             | Default          | Description                            |
+| ------------------ | ---------------- | -------------------------------------- |
+| `-s, --store`      | `bookmarks.json` | Path to the bookmark store file        |
+| `-c, --contentDir` | `content`        | Directory for fetched content          |
+| `-f, --force`      | `false`          | Re-fetch and re-summarize even if done |
+
+**Environment Variables:**
+
+| Variable         | Description           |
+| ---------------- | --------------------- |
+| `GEMINI_API_KEY` | Google Gemini API key |
+
+**Examples:**
+
+```bash
+bookmarks process https://example.com/article   # Fetch and summarize single URL
+bookmarks process                               # Process all bookmarks
+bookmarks process --force                       # Re-process everything
+```
+
+**Notes:**
+
+- Combines fetch and summarize operations in one command
+- Skips bookmarks that already have summaries (unless `--force`)
+- Updates `fetchedAt`, `summary`, `tags`, and `summarizedAt` fields
 
 ---
 
@@ -239,30 +274,18 @@ bookmarks summarize --all --force                 # Re-summarize everything
 src/
 ├── bin.ts              # CLI entry point
 ├── index.ts            # Public exports
-├── types.ts            # TypeScript type definitions
-├── store.ts            # BookmarkStore class for JSON persistence
+├── bookmarks.ts        # BookmarkStore class for JSON persistence
 ├── csv.ts              # CSV parsing utilities
-├── fetcher.ts          # URL content fetching (md.dhr.wtf)
-├── llm.ts              # LLM client (Google Gemini)
+├── markdown.ts         # Markdown fetcher and storage
+├── rate-limiter.ts     # Rate limiting utility
+├── summarizer.ts       # LLM summarizer (Gemini)
 └── cli/
     ├── main.ts         # Main command definition
-    ├── main.test.ts    # Tests for main command
     └── commands/
         ├── sync.ts         # Sync command implementation
-        ├── sync.test.ts    # Tests for sync command
         ├── fetch.ts        # Fetch command implementation
-        ├── fetch.test.ts   # Tests for fetch command
         ├── summarize.ts    # Summarize command implementation
-        ├── summarize.test.ts # Tests for summarize command
+        ├── process.ts      # Process command (fetch + summarize)
         ├── help.ts         # Help command implementation
         └── index.ts        # Command exports
 ```
-
-### Adding New Commands
-
-1. Create a new file in `src/cli/commands/` (e.g., `tag.ts`)
-2. Define the command using `defineCommand()` from citty
-3. Export from `src/cli/commands/index.ts`
-4. Register as a subCommand in `src/cli/main.ts`
-5. Add documentation to this README
-6. Add tests in `src/cli/main.test.ts` or create a dedicated test file

@@ -10,6 +10,7 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Additional strict checks: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
 - Target: ESNext with Node.js module resolution
 - All unused locals/parameters must be removed
+- **No parameter properties** - Node 24's `--experimental-strip-types` doesn't support `constructor(readonly foo: string)` shorthand. Declare properties explicitly. This is enforced by `npm run lint`.
 
 ### Type Safety
 
@@ -124,6 +125,19 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Use `createHash("sha256").update(url).digest("hex").slice(0, 16)` for deterministic, collision-resistant filenames
 - 16 hex chars (64 bits) sufficient for typical bookmark counts
 - Used in: `src/fetcher.ts` urlToHash()
+
+### LLM JSON Output
+
+- Request structured JSON from LLM with explicit format in prompt: `Respond with ONLY valid JSON in this exact format: {"field": "value"}`
+- LLM may wrap JSON in markdown code blocks, so extract with regex: `/```(?:json)?\s*([\s\S]*?)```/`
+- Validate structure and filter arrays for type safety (e.g., non-string tags)
+- Used in: `src/summarizer.ts` parseResponse()
+
+### Intermediate State Persistence
+
+- In multi-step operations (fetch → summarize), save state after each successful step
+- Prevents inconsistent state on retry: if step 2 fails, step 1's result is already persisted
+- Used in: `src/cli/commands/process.ts` processOne()
 
 ## External Skills
 
