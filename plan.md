@@ -40,14 +40,14 @@ Google Sheets (append-only)
 
 ### Phase 2: Sync Command
 
-- [ ] **2.1 Create CSV parser utility**
+- [x] **2.1 Create CSV parser utility**
   - Create `src/csv.ts` with `parseCsv(content)` that extracts URLs from the CSV
   - Handle the expected format: Timestamp, URL, Notes
   - Return array of URLs
   - **Tests**: Parse valid CSV, handle empty rows, handle malformed rows gracefully
   - **README**: No update needed (internal utility)
 
-- [ ] **2.2 Implement sync command**
+- [x] **2.2 Implement sync command**
   - Create `src/cli/commands/sync.ts`
   - Fetch CSV from Google Sheets (reuse existing fetch logic from download)
   - Parse URLs, upsert each into store with `addedAt` timestamp
@@ -56,7 +56,7 @@ Google Sheets (append-only)
   - **Tests**: Mock fetch, test new vs existing bookmarks, test output messages
   - **README**: Replace "Download" section with "Sync" section
 
-- [ ] **2.3 Remove download command**
+- [x] **2.3 Remove download command**
   - Delete `src/cli/commands/download.ts` and `download.test.ts`
   - Update `src/cli/commands/index.ts`
   - Update `src/cli/main.ts` to use sync as subcommand
@@ -162,3 +162,15 @@ Google Sheets (append-only)
 
 - Mixed sync/async fs is a footgun - use `node:fs/promises` consistently
 - Spread ordering matters for type inference: `{...partial, url, addedAt}` (required fields last) avoids type assertions
+
+### Phase 2 Learnings
+
+**What worked well:**
+
+- Simple CSV parser without external dependencies - format is predictable enough
+- Reusing fetch logic from download - straightforward migration to sync
+
+**Design decisions:**
+
+- Only save store if new bookmarks found - avoids unnecessary disk writes
+- Parser returns full rows (timestamp, url, notes) for future flexibility, even if sync only uses URL

@@ -37,6 +37,8 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Run `npm run lint` to check for issues
 - Fix all linting errors before committing
 - Focus on code quality and potential bugs
+- The `--import-plugin -D no-commonjs` flags catch CommonJS `require()` usage - always use ES module imports
+- Note: oxlint doesn't detect unused exports; remove exports that aren't imported elsewhere
 
 ### Naming Conventions
 
@@ -83,10 +85,10 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 
 ## CLI Documentation
 
-- Document all commands using the `bookmarks` keyword (e.g., `bookmarks download`, `bookmarks help`)
+- Document all commands using the `bookmarks` keyword (e.g., `bookmarks sync`, `bookmarks help`)
 - This represents the conceptual command interface, not the exact shell invocation
 - When validating, testing, or running commands locally, use: `npm start -- <command>`
-  - Example: `npm start -- download -o output.csv`
+  - Example: `npm start -- sync -s bookmarks.json`
   - The `--env-file=.env` flag is baked into the npm script
 
 ## Patterns
@@ -103,3 +105,9 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Spread first, required fields last - TypeScript knows required fields are always present
 - Avoids type assertions like `as MyType`
 - Used in: `src/store.ts` BookmarkStore.upsert()
+
+### Conditional Save Pattern
+
+- Track changes (e.g., `newCount`) and only call `save()` if changes occurred
+- Avoids unnecessary disk I/O and preserves file timestamps
+- Used in: `src/cli/commands/sync.ts`

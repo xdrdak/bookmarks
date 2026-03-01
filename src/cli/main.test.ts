@@ -24,6 +24,16 @@ describe("mainCommand", () => {
     expect(resolvedSubCommands).toHaveProperty("help");
   });
 
+  it("should include sync as a subcommand", async () => {
+    const subCommands =
+      typeof mainCommand.subCommands === "function"
+        ? mainCommand.subCommands()
+        : mainCommand.subCommands;
+    const resolvedSubCommands = subCommands instanceof Promise ? await subCommands : subCommands;
+
+    expect(resolvedSubCommands).toHaveProperty("sync");
+  });
+
   it("should throw when run without subcommand", async () => {
     await expect(runCommand(mainCommand, { rawArgs: [] })).rejects.toThrow("No command specified");
   });

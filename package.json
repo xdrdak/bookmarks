@@ -11,7 +11,7 @@
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env src/bin.ts",
-    "lint": "oxlint",
+    "lint": "oxlint --import-plugin -D no-commonjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "vitest"

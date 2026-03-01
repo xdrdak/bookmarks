@@ -100,21 +100,20 @@ Displays usage information for the CLI or a specific subcommand. When run withou
 
 ```bash
 bookmarks help              # Show main help
-bookmarks help add          # Show help for the add command
+bookmarks help sync         # Show help for the sync command
 ```
 
-### Download
+### Sync
 
 ```bash
-bookmarks download [options]    # Download bookmarks from Google Sheets
+bookmarks sync [options]    # Sync bookmarks from Google Sheets to local store
 ```
 
-Fetches the bookmarks CSV from a public Google Sheet and saves it locally. Requires `GOOGLE_SHEET_ID` and `GOOGLE_SHEET_GID` environment variables.
+Fetches bookmarks from a public Google Sheet and syncs them to the local JSON store. New URLs are added; existing URLs are preserved. Requires `GOOGLE_SHEET_ID` and `GOOGLE_SHEET_GID` environment variables.
 
-| Option         | Default         | Description                               |
-| -------------- | --------------- | ----------------------------------------- |
-| `-o, --output` | `bookmarks.csv` | Output file path                          |
-| `-f, --force`  | `false`         | Overwrite existing file without prompting |
+| Option        | Default          | Description                     |
+| ------------- | ---------------- | ------------------------------- |
+| `-s, --store` | `bookmarks.json` | Path to the bookmark store file |
 
 **Environment Variables:**
 
@@ -126,16 +125,16 @@ Fetches the bookmarks CSV from a public Google Sheet and saves it locally. Requi
 **Examples:**
 
 ```bash
-bookmarks download                     # Save to bookmarks.csv
-bookmarks download -o my-bookmarks.csv # Save to custom path
-bookmarks download --force             # Overwrite without prompt
+bookmarks sync                        # Sync to default bookmarks.json
+bookmarks sync -s my-bookmarks.json   # Sync to custom store path
 ```
 
 **Notes:**
 
 - The Google Sheet must be publicly accessible (anyone with link can view)
-- Creates the output file if it doesn't exist
-- Prompts before overwriting existing files (use `--force` to skip)
+- Expected CSV format: `Timestamp,URL,Notes` (header row is skipped)
+- The store file is created if it doesn't exist
+- Only saves to disk if new bookmarks were added
 
 ---
 
@@ -147,12 +146,13 @@ src/
 ├── index.ts            # Public exports
 ├── types.ts            # TypeScript type definitions
 ├── store.ts            # BookmarkStore class for JSON persistence
+├── csv.ts              # CSV parsing utilities
 └── cli/
     ├── main.ts         # Main command definition
     ├── main.test.ts    # Tests for main command
     └── commands/
-        ├── download.ts     # Download command implementation
-        ├── download.test.ts # Tests for download command
+        ├── sync.ts         # Sync command implementation
+        ├── sync.test.ts    # Tests for sync command
         ├── help.ts         # Help command implementation
         └── index.ts        # Command exports
 ```
