@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { runCommand } from "citty";
-import { summarizeCommand } from "./summarize.ts";
 import { join } from "node:path";
-import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { BookmarkStore } from "../../store.ts";
-import { getContentPath } from "../../fetcher.ts";
+import { MarkdownStore, MarkdownFile } from "../../markdown.ts";
+import { summarizeCommand } from "./summarize.ts";
+import { LLMSummarizer } from "../../llm-summarizer.ts";
 
 describe("summarizeCommand", () => {
   const originalEnv = { ...process.env };
   const testDir = join(import.meta.dirname, "test-fixtures", "summarize");
   const contentDir = join(testDir, "content");
+
+  let hasSpy: ReturnType<typeof vi.spyOn>;
+  let getSpy: ReturnType<typeof vi.spyOn>;
+  let summarizeSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     process.env = { ...originalEnv, GEMINI_API_KEY: "test-key" };
@@ -20,14 +25,34 @@ describe("summarizeCommand", () => {
       mkdirSync(contentDir, { recursive: true });
     }
 
-    // Reset and set rate limiters to very short values for testing
-    const llm = await import("../../llm.ts");
-    llm.resetRateLimit();
-    llm.setRateLimit(1);
+    // Track which URLs have content
+    const contentMap = new Map<string, string>();
 
-    const fetcher = await import("../../fetcher.ts");
-    fetcher.resetRateLimit();
-    fetcher.setRateLimit(1);
+    // Spy on prototype methods
+    hasSpy = vi.spyOn(MarkdownStore.prototype, "has").mockImplementation((url: string) => {
+      return Promise.resolve(contentMap.has(url));
+    });
+
+    getSpy = vi.spyOn(MarkdownStore.prototype, "get").mockImplementation((url: string) => {
+      const content = contentMap.get(url);
+      return content
+        ? Promise.resolve(new MarkdownFile(url, content))
+        : Promise.reject(new Error("Not found"));
+    });
+
+    // Mock summarizer for fast tests
+    let callCount = 0;
+    summarizeSpy = vi.spyOn(LLMSummarizer.prototype, "summarize").mockImplementation(() => {
+      callCount++;
+      return Promise.resolve(`Mock summary ${callCount}`);
+    });
+
+    // Helper to add content for tests (URL -> content)
+    (
+      globalThis as unknown as { __addContent: (url: string, content: string) => void }
+    ).__addContent = (url: string, content: string) => {
+      contentMap.set(url, content);
+    };
   });
 
   afterEach(() => {
@@ -35,9 +60,10 @@ describe("summarizeCommand", () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
+    hasSpy.mockRestore();
+    getSpy.mockRestore();
+    summarizeSpy.mockRestore();
     vi.restoreAllMocks();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (global as any).fetch;
   });
 
   it("should have correct meta information", async () => {
@@ -176,30 +202,16 @@ describe("summarizeCommand", () => {
   it("should summarize URL and save to store", async () => {
     const storePath = join(testDir, "summarize.json");
     const url = "https://example.com";
-    const mockSummary = "This is the generated summary.";
 
     // Create store
     const store = await BookmarkStore.load(storePath);
     store.upsert(url, {});
     await store.save();
 
-    // Create content file - ensure directory exists
-    const contentPath = getContentPath(url, contentDir);
-    const contentDirForFile = join(contentPath, "..");
-    if (!existsSync(contentDirForFile)) {
-      mkdirSync(contentDirForFile, { recursive: true });
-    }
-    writeFileSync(contentPath, "# Example Page\n\nContent here.");
-
-    // Mock LLM API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          candidates: [{ content: { parts: [{ text: mockSummary }] } }],
-        }),
-    });
+    // Add content
+    (
+      globalThis as unknown as { __addContent: (url: string, content: string) => void }
+    ).__addContent(url, "# Example Page\n\nContent here.");
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -212,9 +224,8 @@ describe("summarizeCommand", () => {
     // Verify store was updated
     const updatedStore = await BookmarkStore.load(storePath);
     const bookmark = updatedStore.get(url);
-    expect(bookmark?.summary).toBe(mockSummary);
+    expect(bookmark?.summary).toBe("Mock summary 1");
     expect(bookmark?.summarizedAt).toBeDefined();
-    expect(bookmark?.summarizedWith).toBe("gemini-2.0-flash");
 
     consoleSpy.mockRestore();
   });
@@ -222,26 +233,16 @@ describe("summarizeCommand", () => {
   it("should re-summarize with --force", async () => {
     const storePath = join(testDir, "force.json");
     const url = "https://example.com";
-    const newSummary = "New and improved summary.";
 
     // Create store with existing summary
     const store = await BookmarkStore.load(storePath);
     store.upsert(url, { summary: "Old summary" });
     await store.save();
 
-    // Create content file
-    const contentPath = getContentPath(url, contentDir);
-    writeFileSync(contentPath, "Content");
-
-    // Mock LLM API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          candidates: [{ content: { parts: [{ text: newSummary }] } }],
-        }),
-    });
+    // Add content
+    (
+      globalThis as unknown as { __addContent: (url: string, content: string) => void }
+    ).__addContent(url, "Content");
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -251,7 +252,7 @@ describe("summarizeCommand", () => {
 
     // Verify store was updated with new summary
     const updatedStore = await BookmarkStore.load(storePath);
-    expect(updatedStore.get(url)?.summary).toBe(newSummary);
+    expect(updatedStore.get(url)?.summary).toBe("Mock summary 1");
 
     consoleSpy.mockRestore();
   });
@@ -267,22 +268,12 @@ describe("summarizeCommand", () => {
     store.upsert(url2, {});
     await store.save();
 
-    // Create content files
-    writeFileSync(getContentPath(url1, contentDir), "Content A");
-    writeFileSync(getContentPath(url2, contentDir), "Content B");
-
-    let callCount = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockImplementation(() => {
-      callCount++;
-      return Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            candidates: [{ content: { parts: [{ text: `Summary ${callCount}` }] } }],
-          }),
-      });
-    });
+    // Add content for both
+    const addContent = (
+      globalThis as unknown as { __addContent: (url: string, content: string) => void }
+    ).__addContent;
+    addContent(url1, "Content A");
+    addContent(url2, "Content B");
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -311,17 +302,10 @@ describe("summarizeCommand", () => {
     store.upsert(url2, {});
     await store.save();
 
-    // Create content for only url1
-    writeFileSync(getContentPath(url1, contentDir), "Content");
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          candidates: [{ content: { parts: [{ text: "Summary" }] } }],
-        }),
-    });
+    // Only url1 has content
+    (
+      globalThis as unknown as { __addContent: (url: string, content: string) => void }
+    ).__addContent(url1, "Content");
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 

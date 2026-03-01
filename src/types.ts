@@ -18,10 +18,16 @@ export interface EnrichedBookmark {
   fetchedAt?: string;
   /** Timestamp when the summary was generated */
   summarizedAt?: string;
-  /** The LLM model used to generate the summary */
-  summarizedWith?: string;
   /** Timestamp when the bookmark was first added to the store */
   addedAt: string;
+}
+
+/**
+ * Interface for summarizing content.
+ */
+export interface Summarizer {
+  /** Generate a summary from content. */
+  summarize(content: string): Promise<string>;
 }
 
 /**

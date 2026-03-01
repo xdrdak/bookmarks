@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { runCommand } from "citty";
-import { fetchCommand } from "./fetch.ts";
 import { join } from "node:path";
-import { existsSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { BookmarkStore } from "../../store.ts";
-import { getContentPath } from "../../fetcher.ts";
+import { MarkdownStore, MarkdownFetcher, MarkdownFile } from "../../markdown.ts";
+import { fetchCommand } from "./fetch.ts";
 
 describe("fetchCommand", () => {
   const originalEnv = { ...process.env };
   const testDir = join(import.meta.dirname, "test-fixtures", "fetch");
   const contentDir = join(testDir, "content");
+
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let hasSpy: ReturnType<typeof vi.spyOn>;
+  let saveSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     process.env = { ...originalEnv };
@@ -20,10 +24,27 @@ describe("fetchCommand", () => {
       mkdirSync(contentDir, { recursive: true });
     }
 
-    // Reset and set rate limiters to very short values for testing
-    const fetcher = await import("../../fetcher.ts");
-    fetcher.resetRateLimit();
-    fetcher.setRateLimit(1);
+    // Track which URLs have content
+    const contentMap = new Map<string, string>();
+
+    // Spy on prototype methods
+    fetchSpy = vi
+      .spyOn(MarkdownFetcher.prototype, "fetch")
+      .mockImplementation(async (url: string) => {
+        contentMap.set(url, "mock content");
+        return new MarkdownFile(url, "mock content");
+      });
+
+    hasSpy = vi.spyOn(MarkdownStore.prototype, "has").mockImplementation((url: string) => {
+      return Promise.resolve(contentMap.has(url));
+    });
+
+    saveSpy = vi
+      .spyOn(MarkdownStore.prototype, "save")
+      .mockImplementation(async (file: MarkdownFile) => {
+        contentMap.set(file.url, file.content);
+        return join(contentDir, "saved.md");
+      });
   });
 
   afterEach(() => {
@@ -31,9 +52,10 @@ describe("fetchCommand", () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
+    fetchSpy.mockRestore();
+    hasSpy.mockRestore();
+    saveSpy.mockRestore();
     vi.restoreAllMocks();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (global as any).fetch;
   });
 
   it("should have correct meta information", async () => {
@@ -112,9 +134,8 @@ describe("fetchCommand", () => {
     store.upsert(url, {});
     await store.save();
 
-    // Create content file
-    const contentPath = getContentPath(url, contentDir);
-    writeFileSync(contentPath, "existing content");
+    // Content exists
+    hasSpy.mockResolvedValueOnce(true);
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -123,6 +144,7 @@ describe("fetchCommand", () => {
     });
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("already fetched"));
+    expect(fetchSpy).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
   });
@@ -130,19 +152,11 @@ describe("fetchCommand", () => {
   it("should fetch URL and save to disk", async () => {
     const storePath = join(testDir, "fetch.json");
     const url = "https://example.com";
-    const mockContent = "# Fetched Content\n\nThis is the page.";
 
     // Create store
     const store = await BookmarkStore.load(storePath);
     store.upsert(url, {});
     await store.save();
-
-    // Mock fetch
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(mockContent),
-    });
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -151,12 +165,13 @@ describe("fetchCommand", () => {
     });
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Saved to:"));
-
-    // Verify content was saved
-    const contentPath = getContentPath(url, contentDir);
-    expect(existsSync(contentPath)).toBe(true);
-    const savedContent = readFileSync(contentPath, "utf-8");
-    expect(savedContent).toBe(mockContent);
+    expect(fetchSpy).toHaveBeenCalledWith(url);
+    expect(saveSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: url,
+        content: "mock content",
+      }),
+    );
 
     // Verify store was updated
     const updatedStore = await BookmarkStore.load(storePath);
@@ -168,23 +183,11 @@ describe("fetchCommand", () => {
   it("should re-fetch with --force", async () => {
     const storePath = join(testDir, "force.json");
     const url = "https://example.com";
-    const newContent = "New fetched content";
 
     // Create store
     const store = await BookmarkStore.load(storePath);
     store.upsert(url, {});
     await store.save();
-
-    // Create old content
-    const contentPath = getContentPath(url, contentDir);
-    writeFileSync(contentPath, "old content");
-
-    // Mock fetch
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(newContent),
-    });
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -192,9 +195,7 @@ describe("fetchCommand", () => {
       rawArgs: [url, "--store", storePath, "--contentDir", contentDir, "--force"],
     });
 
-    // Verify content was updated
-    const savedContent = readFileSync(contentPath, "utf-8");
-    expect(savedContent).toBe(newContent);
+    expect(fetchSpy).toHaveBeenCalledWith(url);
 
     consoleSpy.mockRestore();
   });
@@ -208,13 +209,7 @@ describe("fetchCommand", () => {
     store.upsert(url, {});
     await store.save();
 
-    // Mock fetch failure
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-    });
+    fetchSpy.mockRejectedValue(new Error("Network error"));
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
@@ -244,13 +239,6 @@ describe("fetchCommand", () => {
     store.upsert(url2, {});
     await store.save();
 
-    // Mock fetch
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve("fetched content"),
-    });
-
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await runCommand(fetchCommand, {
@@ -258,10 +246,7 @@ describe("fetchCommand", () => {
     });
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("2 fetched"));
-
-    // Verify both content files exist
-    expect(existsSync(getContentPath(url1, contentDir))).toBe(true);
-    expect(existsSync(getContentPath(url2, contentDir))).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
 
     consoleSpy.mockRestore();
   });
@@ -277,14 +262,11 @@ describe("fetchCommand", () => {
     store.upsert(url2, {});
     await store.save();
 
-    // Create content for url1
-    writeFileSync(getContentPath(url1, contentDir), "existing");
-
-    // Mock fetch
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve("fetched"),
+    // url1 exists, url2 doesn't
+    let callCount = 0;
+    hasSpy.mockImplementation(() => {
+      callCount++;
+      return Promise.resolve(callCount === 1); // First call (url1) returns true
     });
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -294,6 +276,8 @@ describe("fetchCommand", () => {
     });
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("1 skipped"));
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(url2);
 
     consoleSpy.mockRestore();
   });

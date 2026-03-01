@@ -1,8 +1,7 @@
 import type { ArgsDef, CommandDef } from "citty";
-import { readFile } from "node:fs/promises";
 import { BookmarkStore } from "../../store.ts";
-import { getContentPath, contentExists } from "../../fetcher.ts";
-import { generateSummary } from "../../llm.ts";
+import { MarkdownStore } from "../../markdown.ts";
+import { LLMSummarizer } from "../../llm-summarizer.ts";
 
 export interface SummarizeArgs extends ArgsDef {
   url: {
@@ -94,19 +93,20 @@ export const summarizeCommand: CommandDef<SummarizeArgs> = {
     }
 
     const bookmarkStore = await BookmarkStore.load(store);
+    const markdownStore = new MarkdownStore(contentDir);
 
     if (all) {
-      await summarizeAll(bookmarkStore, contentDir, force);
+      await summarizeAll(bookmarkStore, markdownStore, force);
     } else if (url) {
-      await summarizeOne(bookmarkStore, url, contentDir, force);
+      await summarizeOne(bookmarkStore, markdownStore, url, force);
     }
   },
 };
 
 async function summarizeOne(
   bookmarkStore: BookmarkStore,
+  markdownStore: MarkdownStore,
   url: string,
-  contentDir: string,
   force: boolean,
 ): Promise<void> {
   // Check if bookmark exists
@@ -124,37 +124,36 @@ async function summarizeOne(
   }
 
   // Check if content exists
-  const hasContent = await contentExists(url, contentDir);
+  const hasContent = await markdownStore.has(url);
   if (!hasContent) {
     console.error(`Error: Content not found for URL. Run 'bookmarks fetch ${url}' first.`);
     process.exit(1);
   }
 
   // Read content
-  const contentPath = getContentPath(url, contentDir);
-  const content = await readFile(contentPath, "utf-8");
+  const file = await markdownStore.get(url);
 
   console.log(`Summarizing: ${url}`);
 
   // Generate summary
-  const result = await generateSummary(content);
+  const summarizer = new LLMSummarizer();
+  const summary = await summarizer.summarize(file.content);
 
   // Update store
   bookmarkStore.upsert(url, {
-    summary: result.summary,
+    summary,
     summarizedAt: new Date().toISOString(),
-    summarizedWith: result.model,
   });
 
   await bookmarkStore.save();
 
-  console.log(`Summary generated using ${result.model}`);
-  console.log(`\n${result.summary}\n`);
+  console.log(`Summary generated`);
+  console.log(`\n${summary}\n`);
 }
 
 async function summarizeAll(
   bookmarkStore: BookmarkStore,
-  contentDir: string,
+  markdownStore: MarkdownStore,
   force: boolean,
 ): Promise<void> {
   // Find all bookmarks that need summarizing
@@ -165,12 +164,13 @@ async function summarizeAll(
     return;
   }
 
+  const summarizer = new LLMSummarizer();
   let summarized = 0;
   let skipped = 0;
 
   for (const bookmark of bookmarks) {
     // Check if content exists
-    const hasContent = await contentExists(bookmark.url, contentDir);
+    const hasContent = await markdownStore.has(bookmark.url);
     if (!hasContent) {
       console.log(`Skipping (no content): ${bookmark.url}`);
       skipped++;
@@ -179,19 +179,17 @@ async function summarizeAll(
 
     try {
       // Read content
-      const contentPath = getContentPath(bookmark.url, contentDir);
-      const content = await readFile(contentPath, "utf-8");
+      const file = await markdownStore.get(bookmark.url);
 
       console.log(`Summarizing: ${bookmark.url}`);
 
       // Generate summary
-      const result = await generateSummary(content);
+      const summary = await summarizer.summarize(file.content);
 
       // Update store
       bookmarkStore.upsert(bookmark.url, {
-        summary: result.summary,
+        summary,
         summarizedAt: new Date().toISOString(),
-        summarizedWith: result.model,
       });
 
       summarized++;

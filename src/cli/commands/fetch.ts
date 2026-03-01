@@ -1,6 +1,6 @@
 import type { ArgsDef, CommandDef } from "citty";
 import { BookmarkStore } from "../../store.ts";
-import { fetchUrlContent, contentExists } from "../../fetcher.ts";
+import { MarkdownFetcher, MarkdownStore } from "../../markdown.ts";
 
 export interface FetchArgs extends ArgsDef {
   url: {
@@ -86,19 +86,22 @@ export const fetchCommand: CommandDef<FetchArgs> = {
     }
 
     const bookmarkStore = await BookmarkStore.load(store);
+    const markdownStore = new MarkdownStore(contentDir);
+    const fetcher = new MarkdownFetcher();
 
     if (all) {
-      await fetchAll(bookmarkStore, contentDir, force);
+      await fetchAll(bookmarkStore, markdownStore, fetcher, force);
     } else if (url) {
-      await fetchOne(bookmarkStore, url, contentDir, force);
+      await fetchOne(bookmarkStore, markdownStore, fetcher, url, force);
     }
   },
 };
 
 async function fetchOne(
   bookmarkStore: BookmarkStore,
+  markdownStore: MarkdownStore,
+  fetcher: MarkdownFetcher,
   url: string,
-  contentDir: string,
   force: boolean,
 ): Promise<void> {
   // Check if bookmark exists
@@ -108,8 +111,8 @@ async function fetchOne(
   }
 
   // Check for existing content
-  const exists = await contentExists(url, contentDir);
-  if (exists && !force) {
+  const hasContent = await markdownStore.has(url);
+  if (hasContent && !force) {
     console.log(`Content already fetched: ${url}`);
     console.log("Use --force to re-fetch");
     return;
@@ -118,7 +121,8 @@ async function fetchOne(
   console.log(`Fetching: ${url}`);
 
   try {
-    const result = await fetchUrlContent(url, contentDir, force);
+    const file = await fetcher.fetch(url);
+    const path = await markdownStore.save(file);
 
     // Update store with fetched timestamp
     bookmarkStore.upsert(url, {
@@ -126,11 +130,7 @@ async function fetchOne(
     });
     await bookmarkStore.save();
 
-    if (result.fetched) {
-      console.log(`Saved to: ${result.path}`);
-    } else {
-      console.log(`Already exists: ${result.path}`);
-    }
+    console.log(`Saved to: ${path}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Error fetching ${url}: ${message}`);
@@ -140,7 +140,8 @@ async function fetchOne(
 
 async function fetchAll(
   bookmarkStore: BookmarkStore,
-  contentDir: string,
+  markdownStore: MarkdownStore,
+  fetcher: MarkdownFetcher,
   force: boolean,
 ): Promise<void> {
   // Find all bookmarks that need fetching
@@ -157,8 +158,8 @@ async function fetchAll(
 
   for (const bookmark of bookmarks) {
     // Check if content already exists (may have been fetched before without updating store)
-    const exists = await contentExists(bookmark.url, contentDir);
-    if (exists && !force) {
+    const hasContent = await markdownStore.has(bookmark.url);
+    if (hasContent && !force) {
       console.log(`Skipping (already exists): ${bookmark.url}`);
       skipped++;
       continue;
@@ -167,7 +168,8 @@ async function fetchAll(
     try {
       console.log(`Fetching: ${bookmark.url}`);
 
-      await fetchUrlContent(bookmark.url, contentDir, force);
+      const file = await fetcher.fetch(bookmark.url);
+      await markdownStore.save(file);
 
       // Update store
       bookmarkStore.upsert(bookmark.url, {
