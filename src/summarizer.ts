@@ -18,14 +18,14 @@ export interface Summarizer {
   summarize(content: string): Promise<SummarizerResult>;
 }
 
-/** Default z.ai model to use */
+/** Default model to use */
 const DEFAULT_MODEL = "glm-4.7-flash";
 
-/** Default rate limit in milliseconds (z.ai doesn't publish limits, be conservative) */
+/** Default rate limit in milliseconds */
 const DEFAULT_RATE_LIMIT_MS = 1_000;
 
-/** Options for configuring ZAiSummarizer. */
-export interface ZAiSummarizerOptions {
+/** Options for configuring OpenAISummarizer. */
+export interface OpenAISummarizerOptions {
   /** Rate limit in milliseconds (default: 1000) */
   rateLimitMs?: number;
   /** Model to use (default: glm-4.7-flash) */
@@ -45,25 +45,25 @@ export class ErrorPageError extends Error {
 }
 
 /**
- * Summarizes content using z.ai API (OpenAI-compatible).
+ * Summarizes content using OpenAI-compatible API.
  */
-export class ZAiSummarizer implements Summarizer {
+export class OpenAISummarizer implements Summarizer {
   private readonly model: string;
   private readonly rateLimitMs: number;
   private readonly client: OpenAI;
   private lastRequestTime = 0;
   private rateLimitPromise: Promise<void> | null = null;
 
-  constructor(options?: ZAiSummarizerOptions) {
+  constructor(options?: OpenAISummarizerOptions) {
     this.model = options?.model ?? DEFAULT_MODEL;
     this.rateLimitMs = options?.rateLimitMs ?? DEFAULT_RATE_LIMIT_MS;
 
     if (options?.client) {
       this.client = options.client;
     } else {
-      const apiKey = process.env.BOOKMARKS_ZAI_API_KEY;
+      const apiKey = process.env.BOOKMARKS_OPENAI_API_KEY;
       if (!apiKey) {
-        throw new Error("BOOKMARKS_ZAI_API_KEY environment variable is not set");
+        throw new Error("BOOKMARKS_OPENAI_API_KEY environment variable is not set");
       }
 
       this.client = new OpenAI({
@@ -120,7 +120,7 @@ ${content}`,
     const rawText = response.choices[0]?.message?.content;
 
     if (!rawText) {
-      throw new Error("No response generated from z.ai API");
+      throw new Error("No response generated from API");
     }
 
     return this.parseResponse(rawText);
@@ -197,6 +197,6 @@ ${content}`,
 }
 
 /**
- * @deprecated Use ZAiSummarizer instead. This alias is provided for backwards compatibility.
+ * @deprecated Use OpenAISummarizer instead. This alias is provided for backwards compatibility.
  */
-export const LLMSummarizer = ZAiSummarizer;
+export const LLMSummarizer = OpenAISummarizer;

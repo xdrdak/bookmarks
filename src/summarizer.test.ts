@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { ZAiSummarizer, LLMSummarizer, ErrorPageError } from "./summarizer.ts";
+import { OpenAISummarizer, LLMSummarizer, ErrorPageError } from "./summarizer.ts";
 import type OpenAI from "openai";
 
 function createMockClient(responses: Array<{ content: string | null; choices?: unknown[] }> = []) {
@@ -33,27 +33,27 @@ function createMockClient(responses: Array<{ content: string | null; choices?: u
   } as unknown as OpenAI;
 }
 
-describe("ZAiSummarizer", () => {
+describe("OpenAISummarizer", () => {
   describe("constructor", () => {
-    const originalEnv = process.env.BOOKMARKS_ZAI_API_KEY;
+    const originalEnv = process.env.BOOKMARKS_OPENAI_API_KEY;
 
     afterEach(() => {
       if (originalEnv !== undefined) {
-        process.env.BOOKMARKS_ZAI_API_KEY = originalEnv;
+        process.env.BOOKMARKS_OPENAI_API_KEY = originalEnv;
       } else {
-        delete process.env.BOOKMARKS_ZAI_API_KEY;
+        delete process.env.BOOKMARKS_OPENAI_API_KEY;
       }
     });
 
-    it("should throw if BOOKMARKS_ZAI_API_KEY is missing and no client provided", () => {
-      delete process.env.BOOKMARKS_ZAI_API_KEY;
-      expect(() => new ZAiSummarizer()).toThrow("BOOKMARKS_ZAI_API_KEY environment variable is not set");
+    it("should throw if BOOKMARKS_OPENAI_API_KEY is missing and no client provided", () => {
+      delete process.env.BOOKMARKS_OPENAI_API_KEY;
+      expect(() => new OpenAISummarizer()).toThrow("BOOKMARKS_OPENAI_API_KEY environment variable is not set");
     });
 
     it("should not throw when client is provided even without API key", () => {
-      delete process.env.BOOKMARKS_ZAI_API_KEY;
+      delete process.env.BOOKMARKS_OPENAI_API_KEY;
       const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
-      expect(() => new ZAiSummarizer({ client: mockClient })).not.toThrow();
+      expect(() => new OpenAISummarizer({ client: mockClient })).not.toThrow();
     });
   });
 
@@ -63,7 +63,7 @@ describe("ZAiSummarizer", () => {
         { content: '{"summary":"This is a summary.","tags":["tech","ai"]}' },
       ]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       const result = await summarizer.summarize("Long article content here...");
 
       expect(result.summary).toBe("This is a summary.");
@@ -74,7 +74,7 @@ describe("ZAiSummarizer", () => {
       const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
       const content = "Special content to summarize.";
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await summarizer.summarize(content);
 
       const mockCreate = (
@@ -93,7 +93,7 @@ describe("ZAiSummarizer", () => {
     it("should call API with correct parameters", async () => {
       const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await summarizer.summarize("content");
 
       const mockCreate = (
@@ -111,7 +111,7 @@ describe("ZAiSummarizer", () => {
     it("should use custom model if provided", async () => {
       const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient, model: "glm-4.7-flash" });
+      const summarizer = new OpenAISummarizer({ client: mockClient, model: "glm-4.7-flash" });
       await summarizer.summarize("content");
 
       const mockCreate = (
@@ -127,32 +127,32 @@ describe("ZAiSummarizer", () => {
     it("should throw if no response content", async () => {
       const mockClient = createMockClient([{ content: null }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow(
-        "No response generated from z.ai API",
+        "No response generated from API",
       );
     });
 
     it("should throw if no choices returned", async () => {
       const mockClient = createMockClient([{ content: null, choices: [] }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow(
-        "No response generated from z.ai API",
+        "No response generated from API",
       );
     });
 
     it("should throw on malformed JSON", async () => {
       const mockClient = createMockClient([{ content: "not valid json" }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow("Failed to parse LLM response");
     });
 
     it("should throw if summary is missing", async () => {
       const mockClient = createMockClient([{ content: '{"tags":["test"]}' }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow(
         "Response missing 'summary' string",
       );
@@ -161,7 +161,7 @@ describe("ZAiSummarizer", () => {
     it("should throw if tags is not an array", async () => {
       const mockClient = createMockClient([{ content: '{"summary":"test","tags":"not-array"}' }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow(
         "Response missing 'tags' array",
       );
@@ -172,7 +172,7 @@ describe("ZAiSummarizer", () => {
         { content: '{"summary":"test","tags":["valid",123,null,"also-valid"]}' },
       ]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       const result = await summarizer.summarize("content");
 
       expect(result.tags).toEqual(["valid", "also-valid"]);
@@ -184,7 +184,7 @@ describe("ZAiSummarizer", () => {
         { content: '{"isError": true, "errorMessage": "HTTP 403 Forbidden"}' },
       ]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       const errorContent = "Warning: Target URL returned error 403: Forbidden";
 
       await expect(summarizer.summarize(errorContent)).rejects.toThrow(ErrorPageError);
@@ -194,7 +194,7 @@ describe("ZAiSummarizer", () => {
     it("should throw ErrorPageError with default message when errorMessage is missing", async () => {
       const mockClient = createMockClient([{ content: '{"isError": true}' }]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient });
       await expect(summarizer.summarize("Some error page")).rejects.toThrow(
         "Detected as error page",
       );
@@ -208,7 +208,7 @@ describe("ZAiSummarizer", () => {
         { content: '{"summary":"s","tags":[]}' },
       ]);
 
-      const summarizer = new ZAiSummarizer({ client: mockClient, rateLimitMs: 100 });
+      const summarizer = new OpenAISummarizer({ client: mockClient, rateLimitMs: 100 });
 
       const start = Date.now();
       await summarizer.summarize("content1");
@@ -227,8 +227,8 @@ describe("ZAiSummarizer", () => {
       const mockClient1 = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
       const mockClient2 = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
 
-      const summarizer1 = new ZAiSummarizer({ client: mockClient1, rateLimitMs: 50 });
-      const summarizer2 = new ZAiSummarizer({ client: mockClient2, rateLimitMs: 50 });
+      const summarizer1 = new OpenAISummarizer({ client: mockClient1, rateLimitMs: 50 });
+      const summarizer2 = new OpenAISummarizer({ client: mockClient2, rateLimitMs: 50 });
 
       const start = Date.now();
       await Promise.all([summarizer1.summarize("content1"), summarizer2.summarize("content2")]);
@@ -241,8 +241,8 @@ describe("ZAiSummarizer", () => {
 });
 
 describe("LLMSummarizer (backwards compatibility alias)", () => {
-  it("should be an alias for ZAiSummarizer", () => {
-    expect(LLMSummarizer).toBe(ZAiSummarizer);
+  it("should be an alias for OpenAISummarizer", () => {
+    expect(LLMSummarizer).toBe(OpenAISummarizer);
   });
 });
 

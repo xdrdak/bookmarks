@@ -87,8 +87,8 @@ export const summarizeCommand: CommandDef<SummarizeArgs> = {
     }
 
     // Check for API key
-    if (!process.env.BOOKMARKS_ZAI_API_KEY) {
-      console.error("Error: BOOKMARKS_ZAI_API_KEY environment variable is not set");
+    if (!process.env.BOOKMARKS_OPENAI_API_KEY) {
+      console.error("Error: BOOKMARKS_OPENAI_API_KEY environment variable is not set");
       process.exit(1);
     }
 
