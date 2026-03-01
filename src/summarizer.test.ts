@@ -1,216 +1,214 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { LLMSummarizer } from "./summarizer.ts";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { ZAiSummarizer, LLMSummarizer, ErrorPageError } from "./summarizer.ts";
+import type OpenAI from "openai";
 
-describe("LLMSummarizer", () => {
-  const mockApiKey = "test-api-key";
+function createMockClient(responses: Array<{ content: string | null; choices?: unknown[] }> = []) {
+  const mockCreate = vi.fn();
 
-  beforeEach(() => {
-    vi.stubEnv("GEMINI_API_KEY", mockApiKey);
+  for (const response of responses) {
+    mockCreate.mockResolvedValueOnce({
+      choices: response.choices ?? [
+        {
+          message: {
+            content: response.content,
+          },
+        },
+      ],
+    });
+  }
+
+  // Default response for any calls beyond the prepared ones
+  mockCreate.mockImplementation(() => {
+    return Promise.resolve({
+      choices: [{ message: { content: '{"summary":"default","tags":[]}' } }],
+    });
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
+  return {
+    chat: {
+      completions: {
+        create: mockCreate,
+      },
+    },
+  } as unknown as OpenAI;
+}
+
+describe("ZAiSummarizer", () => {
+  describe("constructor", () => {
+    const originalEnv = process.env.BOOKMARKS_ZAI_API_KEY;
+
+    afterEach(() => {
+      if (originalEnv !== undefined) {
+        process.env.BOOKMARKS_ZAI_API_KEY = originalEnv;
+      } else {
+        delete process.env.BOOKMARKS_ZAI_API_KEY;
+      }
+    });
+
+    it("should throw if BOOKMARKS_ZAI_API_KEY is missing and no client provided", () => {
+      delete process.env.BOOKMARKS_ZAI_API_KEY;
+      expect(() => new ZAiSummarizer()).toThrow("BOOKMARKS_ZAI_API_KEY environment variable is not set");
+    });
+
+    it("should not throw when client is provided even without API key", () => {
+      delete process.env.BOOKMARKS_ZAI_API_KEY;
+      const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
+      expect(() => new ZAiSummarizer({ client: mockClient })).not.toThrow();
+    });
   });
 
   describe("summarize", () => {
     it("should generate summary and tags from content", async () => {
-      const mockResponse = JSON.stringify({
-        summary: "This is a summary of the content.",
-        tags: ["technology", "ai"],
-      });
-      const content = "Long article content here...";
+      const mockClient = createMockClient([
+        { content: '{"summary":"This is a summary.","tags":["tech","ai"]}' },
+      ]);
 
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: mockResponse }],
-              },
-            },
-          ],
-        }),
-      } as Response);
+      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const result = await summarizer.summarize("Long article content here...");
 
-      const summarizer = new LLMSummarizer();
-      const result = await summarizer.summarize(content);
-
-      expect(result.summary).toBe("This is a summary of the content.");
-      expect(result.tags).toEqual(["technology", "ai"]);
-
-      // Verify API call structure
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-        ),
-        expect.objectContaining({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
-
-    it("should include API key in URL", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
-        }),
-      } as Response);
-
-      const summarizer = new LLMSummarizer();
-      await summarizer.summarize("content");
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`key=${mockApiKey}`),
-        expect.any(Object),
-      );
-    });
-
-    it("should throw if API key is missing", async () => {
-      vi.unstubAllEnvs();
-
-      const summarizer = new LLMSummarizer();
-      await expect(summarizer.summarize("content")).rejects.toThrow(
-        "GEMINI_API_KEY environment variable is not set",
-      );
-    });
-
-    it("should throw on HTTP error", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: false,
-        status: 403,
-        text: async () => "API key invalid",
-      } as Response);
-
-      const summarizer = new LLMSummarizer();
-      await expect(summarizer.summarize("content")).rejects.toThrow(
-        "Gemini API error (HTTP 403): API key invalid",
-      );
-    });
-
-    it("should throw if no response generated", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({ candidates: [] }),
-      } as Response);
-
-      const summarizer = new LLMSummarizer();
-      await expect(summarizer.summarize("content")).rejects.toThrow(
-        "No response generated from Gemini API",
-      );
+      expect(result.summary).toBe("This is a summary.");
+      expect(result.tags).toEqual(["tech", "ai"]);
     });
 
     it("should include content in prompt", async () => {
-      const content = "This is my special content to summarize.";
+      const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
+      const content = "Special content to summarize.";
 
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
-        }),
-      } as Response);
-
-      const summarizer = new LLMSummarizer();
+      const summarizer = new ZAiSummarizer({ client: mockClient });
       await summarizer.summarize(content);
 
-      const calls = vi.mocked(global.fetch).mock.calls;
-      expect(calls[0]).toBeDefined();
-      const body = JSON.parse(calls[0]![1]!.body as string);
+      const mockCreate = (
+        mockClient as unknown as { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+      ).chat.completions.create;
 
-      expect(body.contents[0].parts[0].text).toContain(content);
+      const callArgs = mockCreate.mock.calls[0]![0];
+      expect(callArgs.messages[1]).toEqual(
+        expect.objectContaining({
+          role: "user",
+          content: expect.stringContaining(content),
+        }),
+      );
     });
 
-    it("should parse JSON wrapped in markdown code block", async () => {
-      const mockResponse = '```json\n{"summary":"Test summary","tags":["test"]}\n```';
+    it("should call API with correct parameters", async () => {
+      const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
 
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: mockResponse }] } }],
+      const summarizer = new ZAiSummarizer({ client: mockClient });
+      await summarizer.summarize("content");
+
+      const mockCreate = (
+        mockClient as unknown as { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+      ).chat.completions.create;
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "glm-4.7-flash",
+          response_format: { type: "json_object" },
+          temperature: 0.7,
         }),
-      } as Response);
+      );
+    });
 
-      const summarizer = new LLMSummarizer();
-      const result = await summarizer.summarize("content");
+    it("should use custom model if provided", async () => {
+      const mockClient = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
 
-      expect(result.summary).toBe("Test summary");
-      expect(result.tags).toEqual(["test"]);
+      const summarizer = new ZAiSummarizer({ client: mockClient, model: "glm-4.7-flash" });
+      await summarizer.summarize("content");
+
+      const mockCreate = (
+        mockClient as unknown as { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+      ).chat.completions.create;
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: "glm-4.7-flash",
+        }),
+      );
+    });
+
+    it("should throw if no response content", async () => {
+      const mockClient = createMockClient([{ content: null }]);
+
+      const summarizer = new ZAiSummarizer({ client: mockClient });
+      await expect(summarizer.summarize("content")).rejects.toThrow(
+        "No response generated from z.ai API",
+      );
+    });
+
+    it("should throw if no choices returned", async () => {
+      const mockClient = createMockClient([{ content: null, choices: [] }]);
+
+      const summarizer = new ZAiSummarizer({ client: mockClient });
+      await expect(summarizer.summarize("content")).rejects.toThrow(
+        "No response generated from z.ai API",
+      );
     });
 
     it("should throw on malformed JSON", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: "not valid json" }] } }],
-        }),
-      } as Response);
+      const mockClient = createMockClient([{ content: "not valid json" }]);
 
-      const summarizer = new LLMSummarizer();
+      const summarizer = new ZAiSummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow("Failed to parse LLM response");
     });
 
     it("should throw if summary is missing", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"tags":["test"]}' }] } }],
-        }),
-      } as Response);
+      const mockClient = createMockClient([{ content: '{"tags":["test"]}' }]);
 
-      const summarizer = new LLMSummarizer();
+      const summarizer = new ZAiSummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow(
         "Response missing 'summary' string",
       );
     });
 
     it("should throw if tags is not an array", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"summary":"test","tags":"not-array"}' }] } }],
-        }),
-      } as Response);
+      const mockClient = createMockClient([{ content: '{"summary":"test","tags":"not-array"}' }]);
 
-      const summarizer = new LLMSummarizer();
+      const summarizer = new ZAiSummarizer({ client: mockClient });
       await expect(summarizer.summarize("content")).rejects.toThrow(
         "Response missing 'tags' array",
       );
     });
 
     it("should filter non-string tags", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: '{"summary":"test","tags":["valid",123,null,"also-valid"]}' }],
-              },
-            },
-          ],
-        }),
-      } as Response);
+      const mockClient = createMockClient([
+        { content: '{"summary":"test","tags":["valid",123,null,"also-valid"]}' },
+      ]);
 
-      const summarizer = new LLMSummarizer();
+      const summarizer = new ZAiSummarizer({ client: mockClient });
       const result = await summarizer.summarize("content");
 
       expect(result.tags).toEqual(["valid", "also-valid"]);
+    });
+
+    it("should throw ErrorPageError when LLM detects error page", async () => {
+      const mockClient = createMockClient([
+        { content: '{"isError": true, "errorMessage": "HTTP 403 Forbidden"}' },
+        { content: '{"isError": true, "errorMessage": "HTTP 403 Forbidden"}' },
+      ]);
+
+      const summarizer = new ZAiSummarizer({ client: mockClient });
+      const errorContent = "Warning: Target URL returned error 403: Forbidden";
+
+      await expect(summarizer.summarize(errorContent)).rejects.toThrow(ErrorPageError);
+      await expect(summarizer.summarize(errorContent)).rejects.toThrow("HTTP 403 Forbidden");
+    });
+
+    it("should throw ErrorPageError with default message when errorMessage is missing", async () => {
+      const mockClient = createMockClient([{ content: '{"isError": true}' }]);
+
+      const summarizer = new ZAiSummarizer({ client: mockClient });
+      await expect(summarizer.summarize("Some error page")).rejects.toThrow(
+        "Detected as error page",
+      );
     });
   });
 
   describe("rate limiting", () => {
     it("should enforce rate limit between requests", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
-        }),
-      } as Response);
+      const mockClient = createMockClient([
+        { content: '{"summary":"s","tags":[]}' },
+        { content: '{"summary":"s","tags":[]}' },
+      ]);
 
-      const summarizer = new LLMSummarizer({ rateLimitMs: 100 });
+      const summarizer = new ZAiSummarizer({ client: mockClient, rateLimitMs: 100 });
 
       const start = Date.now();
       await summarizer.summarize("content1");
@@ -218,19 +216,19 @@ describe("LLMSummarizer", () => {
       const elapsed = Date.now() - start;
 
       expect(elapsed).toBeGreaterThanOrEqual(90);
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+
+      const mockCreate = (
+        mockClient as unknown as { chat: { completions: { create: ReturnType<typeof vi.fn> } } }
+      ).chat.completions.create;
+      expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
     it("should have independent rate limiters per instance", async () => {
-      vi.spyOn(global, "fetch").mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          candidates: [{ content: { parts: [{ text: '{"summary":"s","tags":[]}' }] } }],
-        }),
-      } as Response);
+      const mockClient1 = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
+      const mockClient2 = createMockClient([{ content: '{"summary":"s","tags":[]}' }]);
 
-      const summarizer1 = new LLMSummarizer({ rateLimitMs: 50 });
-      const summarizer2 = new LLMSummarizer({ rateLimitMs: 50 });
+      const summarizer1 = new ZAiSummarizer({ client: mockClient1, rateLimitMs: 50 });
+      const summarizer2 = new ZAiSummarizer({ client: mockClient2, rateLimitMs: 50 });
 
       const start = Date.now();
       await Promise.all([summarizer1.summarize("content1"), summarizer2.summarize("content2")]);
@@ -238,7 +236,21 @@ describe("LLMSummarizer", () => {
 
       // Parallel calls with different instances should not wait for each other
       expect(elapsed).toBeLessThan(80);
-      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe("LLMSummarizer (backwards compatibility alias)", () => {
+  it("should be an alias for ZAiSummarizer", () => {
+    expect(LLMSummarizer).toBe(ZAiSummarizer);
+  });
+});
+
+describe("ErrorPageError", () => {
+  it("should be an instance of Error", () => {
+    const error = new ErrorPageError("test error");
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe("ErrorPageError");
+    expect(error.message).toBe("test error");
   });
 });

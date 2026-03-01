@@ -4,7 +4,7 @@ import {
   syncCommand,
   summarizeCommand,
   fetchCommand,
-  processCommand,
+  statusCommand,
 } from "./commands/index.ts";
 
 import { readFileSync } from "node:fs";
@@ -31,7 +31,7 @@ export const mainCommand = defineCommand({
     sync: syncCommand,
     summarize: summarizeCommand,
     fetch: fetchCommand,
-    process: processCommand,
+    status: statusCommand,
   },
 });
 

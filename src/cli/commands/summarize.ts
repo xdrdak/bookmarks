@@ -1,7 +1,7 @@
 import type { ArgsDef, CommandDef } from "citty";
 import { BookmarkStore } from "../../bookmarks.ts";
 import { MarkdownStore } from "../../markdown.ts";
-import { LLMSummarizer } from "../../summarizer.ts";
+import { LLMSummarizer, ErrorPageError } from "../../summarizer.ts";
 
 export interface SummarizeArgs extends ArgsDef {
   url: {
@@ -87,8 +87,8 @@ export const summarizeCommand: CommandDef<SummarizeArgs> = {
     }
 
     // Check for API key
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("Error: GEMINI_API_KEY environment variable is not set");
+    if (!process.env.BOOKMARKS_ZAI_API_KEY) {
+      console.error("Error: BOOKMARKS_ZAI_API_KEY environment variable is not set");
       process.exit(1);
     }
 
@@ -137,7 +137,19 @@ async function summarizeOne(
 
   // Generate summary and tags
   const summarizer = new LLMSummarizer();
-  const result = await summarizer.summarize(file.content);
+
+  let result;
+  try {
+    result = await summarizer.summarize(file.content);
+  } catch (error) {
+    if (error instanceof ErrorPageError) {
+      // Content is an error page - store URL as summary with empty tags
+      result = { summary: url, tags: [] };
+      console.log(`Detected error page: ${error.message}`);
+    } else {
+      throw error;
+    }
+  }
 
   // Update store
   bookmarkStore.upsert(url, {
@@ -186,7 +198,18 @@ async function summarizeAll(
       console.log(`Summarizing: ${bookmark.url}`);
 
       // Generate summary and tags
-      const result = await summarizer.summarize(file.content);
+      let result;
+      try {
+        result = await summarizer.summarize(file.content);
+      } catch (error) {
+        if (error instanceof ErrorPageError) {
+          // Content is an error page - store URL as summary with empty tags
+          result = { summary: bookmark.url, tags: [] };
+          console.log(`Detected error page: ${error.message}`);
+        } else {
+          throw error;
+        }
+      }
 
       // Update store
       bookmarkStore.upsert(bookmark.url, {

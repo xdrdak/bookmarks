@@ -17,7 +17,7 @@ describe("summarizeCommand", () => {
   let summarizeSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    process.env = { ...originalEnv, GEMINI_API_KEY: "test-key" };
+    process.env = { ...originalEnv, BOOKMARKS_ZAI_API_KEY: "test-key" };
     if (!existsSync(testDir)) {
       mkdirSync(testDir, { recursive: true });
     }
@@ -119,8 +119,8 @@ describe("summarizeCommand", () => {
     exitSpy.mockRestore();
   });
 
-  it("should error when GEMINI_API_KEY is not set", async () => {
-    delete process.env.GEMINI_API_KEY;
+  it("should error when BOOKMARKS_ZAI_API_KEY is not set", async () => {
+    delete process.env.BOOKMARKS_ZAI_API_KEY;
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
@@ -131,7 +131,7 @@ describe("summarizeCommand", () => {
       runCommand(summarizeCommand, { rawArgs: ["https://example.com"] }),
     ).rejects.toThrow("process.exit");
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("GEMINI_API_KEY"));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("BOOKMARKS_ZAI_API_KEY"));
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();

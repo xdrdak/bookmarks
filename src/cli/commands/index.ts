@@ -6,5 +6,5 @@ export { summarizeCommand } from "./summarize.ts";
 export type { SummarizeArgs } from "./summarize.ts";
 export { fetchCommand } from "./fetch.ts";
 export type { FetchArgs } from "./fetch.ts";
-export { processCommand } from "./process.ts";
-export type { ProcessArgs } from "./process.ts";
+export { statusCommand } from "./status.ts";
+export type { StatusArgs } from "./status.ts";

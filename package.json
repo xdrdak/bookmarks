@@ -18,7 +18,8 @@
     "test": "vitest"
   },
   "dependencies": {
-    "citty": "^0.2.1"
+    "citty": "^0.2.1",
+    "openai": "^6.25.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.6",

@@ -139,6 +139,19 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Prevents inconsistent state on retry: if step 2 fails, step 1's result is already persisted
 - Used in: `src/cli/commands/process.ts` processOne()
 
+### Interface Stability
+
+- **Do not eagerly modify established interfaces** - they are contracts with callers
+- Before changing an interface signature, consider:
+  - How many places call this?
+  - Will this break existing code?
+  - Is there a way to achieve the goal without changing the interface?
+- If an interface change seems necessary, **propose it first** with:
+  - What needs to change
+  - Why it's needed
+  - Alternative approaches considered
+- Prefer solutions that preserve interfaces (e.g., throw a custom error instead of adding a required parameter)
+
 ## External Skills
 
 - **citty-expert** - Use `/skill:citty-expert` for CLI argument patterns, testing commands, and debugging flag issues

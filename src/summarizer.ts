@@ -1,3 +1,5 @@
+import OpenAI from "openai";
+
 /**
  * Result from summarizing content.
  */
@@ -16,101 +18,117 @@ export interface Summarizer {
   summarize(content: string): Promise<SummarizerResult>;
 }
 
-/** Rate limit for Gemini free tier: ~15 RPM for Flash models = 4 seconds between requests */
-const DEFAULT_RATE_LIMIT_MS = 4_000;
+/** Default z.ai model to use */
+const DEFAULT_MODEL = "glm-4.7-flash";
 
-/** Default Gemini model to use */
-const DEFAULT_MODEL = "gemini-2.0-flash";
+/** Default rate limit in milliseconds (z.ai doesn't publish limits, be conservative) */
+const DEFAULT_RATE_LIMIT_MS = 1_000;
 
-/** Options for configuring LLMSummarizer. */
-export interface LLMSummarizerOptions {
-  /** Rate limit in milliseconds (default: 4000 for Gemini free tier) */
+/** Options for configuring ZAiSummarizer. */
+export interface ZAiSummarizerOptions {
+  /** Rate limit in milliseconds (default: 1000) */
   rateLimitMs?: number;
+  /** Model to use (default: glm-4.7-flash) */
+  model?: string;
+  /** Pre-configured OpenAI client (for testing) */
+  client?: OpenAI;
 }
 
 /**
- * Summarizes content using Google Gemini.
+ * Thrown when the content appears to be an error page rather than valid content.
  */
-export class LLMSummarizer implements Summarizer {
+export class ErrorPageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ErrorPageError";
+  }
+}
+
+/**
+ * Summarizes content using z.ai API (OpenAI-compatible).
+ */
+export class ZAiSummarizer implements Summarizer {
   private readonly model: string;
   private readonly rateLimitMs: number;
+  private readonly client: OpenAI;
   private lastRequestTime = 0;
   private rateLimitPromise: Promise<void> | null = null;
 
-  constructor(options?: LLMSummarizerOptions) {
-    this.model = DEFAULT_MODEL;
+  constructor(options?: ZAiSummarizerOptions) {
+    this.model = options?.model ?? DEFAULT_MODEL;
     this.rateLimitMs = options?.rateLimitMs ?? DEFAULT_RATE_LIMIT_MS;
+
+    if (options?.client) {
+      this.client = options.client;
+    } else {
+      const apiKey = process.env.BOOKMARKS_ZAI_API_KEY;
+      if (!apiKey) {
+        throw new Error("BOOKMARKS_ZAI_API_KEY environment variable is not set");
+      }
+
+      this.client = new OpenAI({
+        apiKey,
+        baseURL: "https://api.z.ai/api/paas/v4/",
+      });
+    }
   }
 
   async summarize(content: string): Promise<SummarizerResult> {
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is not set");
-    }
-
     await this.waitForRateLimit();
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${apiKey}`;
+    const response = await this.client.chat.completions.create({
+      model: this.model,
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant that analyzes web page content and extracts structured information. Always respond with valid JSON.
 
-    const prompt = `Analyze the following web page content and provide:
-1. A concise summary (2-3 paragraphs) covering the main topics, key points, and important details
-2. 3-7 relevant tags for categorization
+IMPORTANT: First check if the content appears to be an error page or failed fetch. Signs include:
+- Application error messages (e.g., "a client-side exception has occurred")
+- HTTP error codes (403, 404, 500, etc.) in the text
+- "Access denied", "Forbidden", or "Unauthorized" messages
+- Client-side exception notices
+- Captcha or bot detection pages
+- Very short content that's clearly not the intended page
+
+If you detect an error page, respond with:
+{"isError": true, "errorMessage": "brief description of the error"}
+
+For normal content, provide a real summary and tags.`,
+        },
+        {
+          role: "user",
+          content: `Analyze the following web page content:
+
+1. FIRST: Check if this appears to be an error page or failed fetch. If so, return: {"isError": true, "errorMessage": "brief description"}
+
+2. If it's valid content, provide:
+   - A concise summary (2-3 paragraphs) covering the main topics, key points, and important details
+   - 3-7 relevant tags for categorization
 
 Respond with ONLY valid JSON in this exact format:
 {"summary": "your summary text here", "tags": ["tag1", "tag2", "tag3"]}
 
 Content:
-${content}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-      }),
+${content}`,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      throw new Error(`Gemini API error (HTTP ${response.status}): ${errorText}`);
-    }
-
-    const data = (await response.json()) as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{ text?: string }>;
-        };
-      }>;
-    };
-
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = response.choices[0]?.message?.content;
 
     if (!rawText) {
-      throw new Error("No response generated from Gemini API");
+      throw new Error("No response generated from z.ai API");
     }
 
     return this.parseResponse(rawText);
   }
 
   private parseResponse(rawText: string): SummarizerResult {
-    // Try to extract JSON from the response (LLM might wrap it in markdown)
-    let jsonText = rawText.trim();
-
-    // Remove markdown code blocks if present
-    const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch?.[1]) {
-      jsonText = jsonMatch[1].trim();
-    }
-
     try {
-      const parsed = JSON.parse(jsonText) as unknown;
+      const parsed = JSON.parse(rawText) as unknown;
 
       // Validate structure
       if (typeof parsed !== "object" || parsed === null) {
@@ -118,6 +136,15 @@ ${content}`;
       }
 
       const obj = parsed as Record<string, unknown>;
+
+      // Check for error page indicator
+      if (obj.isError === true) {
+        const errorMessage =
+          typeof obj.errorMessage === "string"
+            ? obj.errorMessage
+            : "Detected as error page";
+        throw new ErrorPageError(errorMessage);
+      }
 
       if (typeof obj.summary !== "string") {
         throw new Error("Response missing 'summary' string");
@@ -127,15 +154,24 @@ ${content}`;
         throw new Error("Response missing 'tags' array");
       }
 
-      const tags = obj.tags.filter((tag): tag is string => typeof tag === "string");
+      const tags = obj.tags.filter(
+        (tag): tag is string => typeof tag === "string",
+      );
 
       return {
         summary: obj.summary,
         tags,
       };
     } catch (error) {
+      // Re-throw ErrorPageError as-is
+      if (error instanceof ErrorPageError) {
+        throw error;
+      }
+
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to parse LLM response: ${message}\nResponse: ${rawText}`);
+      throw new Error(
+        `Failed to parse LLM response: ${message}\nResponse: ${rawText}`,
+      );
     }
   }
 
@@ -159,3 +195,8 @@ ${content}`;
     this.lastRequestTime = Date.now();
   }
 }
+
+/**
+ * @deprecated Use ZAiSummarizer instead. This alias is provided for backwards compatibility.
+ */
+export const LLMSummarizer = ZAiSummarizer;
