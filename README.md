@@ -50,6 +50,7 @@ Each bookmark in the store contains the following fields:
 | ---------------- | ---------- | -------- | ---------------------------------------- |
 | `url`            | `string`   | Yes      | The URL (acts as unique key)             |
 | `addedAt`        | `string`   | Yes      | ISO timestamp when added to store        |
+| `fetchedAt`      | `string`   | No       | ISO timestamp when content was fetched   |
 | `summary`        | `string`   | No       | LLM-generated summary of page content    |
 | `tags`           | `string[]` | No       | LLM-generated tags for categorization    |
 | `read`           | `boolean`  | No       | Whether user has read/understood         |
@@ -83,6 +84,35 @@ The bookmark store is a JSON file (`bookmarks.json` by default) containing a map
 ```
 
 The store is managed by the `BookmarkStore` class in `src/store.ts`, which provides atomic writes and CRUD operations.
+
+---
+
+## Content Storage
+
+Fetched page content is stored as markdown files in the `content/` directory (configurable). Each file is named using a SHA-256 hash of the URL, making filenames deterministic and collision-resistant.
+
+**Example:**
+
+```
+content/
+├── 100680ad546ce6a5.md    # https://example.com/article
+├── 2a3f8b1c9d4e5f6a.md    # https://another-site.com/blog
+└── ...
+```
+
+The `content/` directory is not tracked by git (added to `.gitignore`).
+
+---
+
+## LLM Configuration
+
+Summarization uses Google Gemini API. Configure via environment variables:
+
+| Variable         | Description           | Required For    |
+| ---------------- | --------------------- | --------------- |
+| `GEMINI_API_KEY` | Google Gemini API key | `summarize` cmd |
+
+**Rate Limits:** The free tier of Gemini Flash allows ~15 requests per minute. The CLI enforces rate limiting automatically.
 
 ---
 
@@ -136,6 +166,71 @@ bookmarks sync -s my-bookmarks.json   # Sync to custom store path
 - The store file is created if it doesn't exist
 - Only saves to disk if new bookmarks were added
 
+### Fetch
+
+```bash
+bookmarks fetch [URL] [options]    # Fetch bookmark content from URLs
+```
+
+Fetches page content from URLs and saves it as markdown files to disk. Uses [md.dhr.wtf](https://md.dhr.wtf) to convert pages to LLM-ready markdown. Content must be fetched before summarizing.
+
+| Option             | Default          | Description                             |
+| ------------------ | ---------------- | --------------------------------------- |
+| `-s, --store`      | `bookmarks.json` | Path to the bookmark store file         |
+| `-c, --contentDir` | `content`        | Directory to save fetched content       |
+| `-f, --force`      | `false`          | Re-fetch even if content already exists |
+| `-a, --all`        | `false`          | Fetch all bookmarks without content     |
+
+**Examples:**
+
+```bash
+bookmarks fetch https://example.com/article     # Fetch single URL
+bookmarks fetch --all                           # Fetch all unfetched bookmarks
+bookmarks fetch --all --force                   # Re-fetch all bookmarks
+```
+
+**Notes:**
+
+- Rate limited to 5 requests/minute (md.dhr.wtf free tier)
+- Skips URLs that already have content (unless `--force`)
+- Updates `fetchedAt` timestamp in the store
+
+### Summarize
+
+```bash
+bookmarks summarize [URL] [options]    # Generate summaries using LLM
+```
+
+Generates AI summaries for bookmarked pages. Requires content to be fetched first (run `bookmarks fetch`). Uses Google Gemini API.
+
+| Option             | Default          | Description                          |
+| ------------------ | ---------------- | ------------------------------------ |
+| `-s, --store`      | `bookmarks.json` | Path to the bookmark store file      |
+| `-c, --contentDir` | `content`        | Directory containing fetched content |
+| `-f, --force`      | `false`          | Re-summarize even if summary exists  |
+| `-a, --all`        | `false`          | Summarize all bookmarks with content |
+
+**Environment Variables:**
+
+| Variable         | Description           |
+| ---------------- | --------------------- |
+| `GEMINI_API_KEY` | Google Gemini API key |
+
+**Examples:**
+
+```bash
+bookmarks summarize https://example.com/article   # Summarize single URL
+bookmarks summarize --all                         # Summarize all with content
+bookmarks summarize --all --force                 # Re-summarize everything
+```
+
+**Notes:**
+
+- Requires `GEMINI_API_KEY` environment variable
+- Rate limited to ~15 requests/minute (Gemini free tier)
+- Skips bookmarks without fetched content
+- Stores summary, `summarizedAt`, and `summarizedWith` fields
+
 ---
 
 ## Architecture
@@ -147,19 +242,25 @@ src/
 ├── types.ts            # TypeScript type definitions
 ├── store.ts            # BookmarkStore class for JSON persistence
 ├── csv.ts              # CSV parsing utilities
+├── fetcher.ts          # URL content fetching (md.dhr.wtf)
+├── llm.ts              # LLM client (Google Gemini)
 └── cli/
     ├── main.ts         # Main command definition
     ├── main.test.ts    # Tests for main command
     └── commands/
         ├── sync.ts         # Sync command implementation
         ├── sync.test.ts    # Tests for sync command
+        ├── fetch.ts        # Fetch command implementation
+        ├── fetch.test.ts   # Tests for fetch command
+        ├── summarize.ts    # Summarize command implementation
+        ├── summarize.test.ts # Tests for summarize command
         ├── help.ts         # Help command implementation
         └── index.ts        # Command exports
 ```
 
 ### Adding New Commands
 
-1. Create a new file in `src/cli/commands/` (e.g., `add.ts`)
+1. Create a new file in `src/cli/commands/` (e.g., `tag.ts`)
 2. Define the command using `defineCommand()` from citty
 3. Export from `src/cli/commands/index.ts`
 4. Register as a subCommand in `src/cli/main.ts`

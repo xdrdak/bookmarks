@@ -14,6 +14,8 @@ export interface EnrichedBookmark {
   readAt?: string;
   /** User's personal notes about this bookmark */
   userNotes?: string;
+  /** Timestamp when the page content was fetched */
+  fetchedAt?: string;
   /** Timestamp when the summary was generated */
   summarizedAt?: string;
   /** The LLM model used to generate the summary */

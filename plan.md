@@ -10,13 +10,16 @@ Google Sheets (append-only)
         ▼
   bookmarks sync ──────► bookmarks.json
                               │
-                              ├─► summarize (URL → LLM summary)
+                              ├─► fetch (URL → md.dhr.wtf → content/*.md)
+                              ├─► summarize (content/*.md → Gemini → summary)
                               ├─► tag (summary → LLM tags)
                               ├─► mark-read
                               └─► note
 ```
 
 **Source of truth**: `bookmarks.json` - a JSON store keyed by URL containing all enriched data.
+
+**Content storage**: `content/` - markdown files fetched from URLs, named by URL hash. Not tracked by git.
 
 ---
 
@@ -65,28 +68,44 @@ Google Sheets (append-only)
 
 ### Phase 3: Summarization
 
-- [ ] **3.1 Create LLM client abstraction**
-  - Create `src/llm.ts` with a simple client for calling an LLM API
-  - Start with one provider (e.g., OpenAI-compatible)
-  - Function: `generateSummary(url, content)` → returns summary text
-  - Handle API key via environment variable
-  - **Tests**: Mock API calls, test error handling
-  - **README**: Add "LLM Configuration" section with required env vars
+- [x] **3.1 Create content fetcher with md.dhr.wtf**
+  - Create `src/fetcher.ts` with `fetchUrlContent(url, contentDir)` → saves markdown to disk
+  - Use `https://md.dhr.wtf?url=<url>` to convert pages to LLM-ready markdown
+  - Rate limit: 5 requests/min (free tier) - implement delay/throttling
+  - Check if content file already exists; if so, skip fetch and warn user
+  - Save content to `content/<hash>.md` where hash is derived from URL
+  - Return path to saved content file
+  - **Tests**: Mock fetch, test rate limiting, test skip-if-exists behavior
+  - **README**: Add "Content Storage" section explaining the content/ folder
 
-- [ ] **3.2 Create URL content fetcher**
-  - Create `src/fetcher.ts` with `fetchUrlContent(url)` → returns page text
-  - Handle errors gracefully (timeouts, 404s, etc.)
-  - Consider truncating very long pages
-  - **Tests**: Mock fetch, test various HTTP responses, test timeout handling
-  - **README**: No update needed (internal utility)
+- [x] **3.2 Add content/ to .gitignore**
+  - Add `content/` to .gitignore so fetched content is not tracked
+  - **Tests**: No tests needed
+  - **README**: Mention in "Content Storage" section
 
-- [ ] **3.3 Implement summarize command**
+- [x] **3.3 Create LLM client with Google Gemini**
+  - Create `src/llm.ts` with `generateSummary(content: string)` → returns summary text
+  - Use Google Gemini API (free tier - respect rate limits: ~15 RPM for flash models)
+  - Handle API key via `GEMINI_API_KEY` environment variable
+  - Implement rate limiting/throttling for free tier
+  - **Tests**: Mock API calls, test error handling, test rate limiting
+  - **README**: Add "LLM Configuration" section with `GEMINI_API_KEY` env var
+
+- [x] **3.4 Implement summarize command**
   - Create `src/cli/commands/summarize.ts`
+  - Flow: Read content from disk → call LLM → store summary with metadata
   - Accept URL as positional argument or `--all` flag for unsummarized bookmarks
-  - Fetch URL content → call LLM → store summary with metadata
-  - Options: `--store`, `--force` (re-summarize even if exists)
-  - **Tests**: Test single URL, test --all, test --force, test already-summarized
+  - Options: `--store`, `--contentDir` (default: `content/`), `--force` (re-summarize)
+  - **Tests**: Test single URL, test --all, test --force, test missing content file
   - **README**: Add "Summarize" section with examples
+
+- [x] **3.5 Implement fetch command** (separate from summarize)
+  - Create `src/cli/commands/fetch.ts`
+  - Fetch URL content via md.dhr.wtf and save to disk (does NOT summarize)
+  - Accept URL as positional argument or `--all` flag for unfetched bookmarks
+  - Options: `--contentDir`, `--force` (re-fetch even if exists)
+  - **Tests**: Test single URL, test --all, test skip-if-exists, test rate limiting
+  - **README**: Add "Fetch" section explaining how to pre-fetch content
 
 ### Phase 4: Tagging
 
@@ -174,3 +193,18 @@ Google Sheets (append-only)
 
 - Only save store if new bookmarks found - avoids unnecessary disk writes
 - Parser returns full rows (timestamp, url, notes) for future flexibility, even if sync only uses URL
+
+### Phase 3 Learnings
+
+**What worked well:**
+
+- Separating fetch and summarize into distinct commands - cleaner separation of concerns
+- Content persisted to disk as markdown files - easy to inspect/debug
+- URL hashing for content filenames - deterministic, no collisions in practice
+- Rate limiting built into modules (not commands) - reusable across contexts
+
+**Gotchas:**
+
+- Citty uses camelCase for CLI args (`--contentDir`), not kebab-case (`--content-dir`)
+- `vi.resetModules()` can cause module instance mismatches - better to set up rate limiters in beforeEach
+- Positional args in citty: `type: "positional"` with access via `args._[0]`

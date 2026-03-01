@@ -111,3 +111,20 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - Track changes (e.g., `newCount`) and only call `save()` if changes occurred
 - Avoids unnecessary disk I/O and preserves file timestamps
 - Used in: `src/cli/commands/sync.ts`
+
+### Rate Limiting for Testability
+
+- Implement rate limiting as module-level state with `setRateLimit(ms)` and `resetRateLimit()` exports
+- Allows tests to use short delays (e.g., 1ms) while production uses real limits
+- Rate limiter should be in the module that makes API calls, not in commands
+- Used in: `src/fetcher.ts`, `src/llm.ts`
+
+### URL Hashing for Filenames
+
+- Use `createHash("sha256").update(url).digest("hex").slice(0, 16)` for deterministic, collision-resistant filenames
+- 16 hex chars (64 bits) sufficient for typical bookmark counts
+- Used in: `src/fetcher.ts` urlToHash()
+
+## External Skills
+
+- **citty-expert** - Use `/skill:citty-expert` for CLI argument patterns, testing commands, and debugging flag issues

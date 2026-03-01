@@ -2,3 +2,7 @@ export { helpCommand } from "./help.ts";
 export type { HelpCommandArgs } from "./help.ts";
 export { syncCommand } from "./sync.ts";
 export type { SyncArgs } from "./sync.ts";
+export { summarizeCommand } from "./summarize.ts";
+export type { SummarizeArgs } from "./summarize.ts";
+export { fetchCommand } from "./fetch.ts";
+export type { FetchArgs } from "./fetch.ts";
