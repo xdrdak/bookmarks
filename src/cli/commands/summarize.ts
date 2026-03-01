@@ -218,16 +218,14 @@ async function summarizeAll(
         summarizedAt: new Date().toISOString(),
       });
 
+      // Save after each successful summarization to preserve progress
+      await bookmarkStore.save();
+
       summarized++;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Error summarizing ${bookmark.url}: ${message}`);
     }
-  }
-
-  // Save all changes
-  if (summarized > 0) {
-    await bookmarkStore.save();
   }
 
   console.log(`\nSummarized ${summarized} bookmarks (${skipped} skipped - no content)`);

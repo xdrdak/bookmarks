@@ -22,7 +22,7 @@ export interface Summarizer {
 const DEFAULT_MODEL = "glm-4.7-flash";
 
 /** Default rate limit in milliseconds */
-const DEFAULT_RATE_LIMIT_MS = 1_000;
+const DEFAULT_RATE_LIMIT_MS = 12_000;
 
 /** Options for configuring OpenAISummarizer. */
 export interface OpenAISummarizerOptions {
@@ -140,9 +140,7 @@ ${content}`,
       // Check for error page indicator
       if (obj.isError === true) {
         const errorMessage =
-          typeof obj.errorMessage === "string"
-            ? obj.errorMessage
-            : "Detected as error page";
+          typeof obj.errorMessage === "string" ? obj.errorMessage : "Detected as error page";
         throw new ErrorPageError(errorMessage);
       }
 
@@ -154,9 +152,7 @@ ${content}`,
         throw new Error("Response missing 'tags' array");
       }
 
-      const tags = obj.tags.filter(
-        (tag): tag is string => typeof tag === "string",
-      );
+      const tags = obj.tags.filter((tag): tag is string => typeof tag === "string");
 
       return {
         summary: obj.summary,
@@ -169,9 +165,7 @@ ${content}`,
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to parse LLM response: ${message}\nResponse: ${rawText}`,
-      );
+      throw new Error(`Failed to parse LLM response: ${message}\nResponse: ${rawText}`);
     }
   }
 
@@ -195,5 +189,3 @@ ${content}`,
     this.lastRequestTime = Date.now();
   }
 }
-
-

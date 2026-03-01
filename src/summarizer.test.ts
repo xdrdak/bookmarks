@@ -47,7 +47,9 @@ describe("OpenAISummarizer", () => {
 
     it("should throw if BOOKMARKS_OPENAI_API_KEY is missing and no client provided", () => {
       delete process.env.BOOKMARKS_OPENAI_API_KEY;
-      expect(() => new OpenAISummarizer()).toThrow("BOOKMARKS_OPENAI_API_KEY environment variable is not set");
+      expect(() => new OpenAISummarizer()).toThrow(
+        "BOOKMARKS_OPENAI_API_KEY environment variable is not set",
+      );
     });
 
     it("should not throw when client is provided even without API key", () => {
@@ -184,7 +186,7 @@ describe("OpenAISummarizer", () => {
         { content: '{"isError": true, "errorMessage": "HTTP 403 Forbidden"}' },
       ]);
 
-      const summarizer = new OpenAISummarizer({ client: mockClient });
+      const summarizer = new OpenAISummarizer({ client: mockClient, rateLimitMs: 1 });
       const errorContent = "Warning: Target URL returned error 403: Forbidden";
 
       await expect(summarizer.summarize(errorContent)).rejects.toThrow(ErrorPageError);

@@ -99,20 +99,27 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
   - Example: `npm start -- sync -s bookmarks.json`
   - The `--env-file=.env` flag is baked into the npm script
 
+### Check CLI First
+
+- **Always check available CLI commands before exploring code**
+- For status queries (e.g., "what bookmarks need summaries?"), use `npm start -- status`
+- Run `npm start --` to see all available commands
+- This avoids reading internal files when the CLI already exposes the answer
+
 ## Patterns
 
 ### Atomic File Writes
 
 - Write to temp file, then rename to target path
 - Prevents corrupted files on crash/interruption
-- Used in: `src/store.ts` BookmarkStore.save()
+- Used in: `src/bookmarks.ts` BookmarkStore.save()
 
 ### Spread Ordering for Type Inference
 
 - When merging partial data with required fields: `{...partial, requiredField: value}`
 - Spread first, required fields last - TypeScript knows required fields are always present
 - Avoids type assertions like `as MyType`
-- Used in: `src/store.ts` BookmarkStore.upsert()
+- Used in: `src/bookmarks.ts` BookmarkStore.upsert()
 
 ### Conditional Save Pattern
 
@@ -122,21 +129,21 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 
 ### Rate Limiting for Testability
 
-- Implement rate limiting as module-level state with `setRateLimit(ms)` and `resetRateLimit()` exports
+- Use the `RateLimiter` class from `src/rate-limiter.ts` with `setRateLimit(ms)` and `reset()` methods
 - Allows tests to use short delays (e.g., 1ms) while production uses real limits
-- Rate limiter should be in the module that makes API calls, not in commands
-- Used in: `src/fetcher.ts`, `src/llm.ts`
+- Inject rate limiter via constructor for testability
+- Used in: `src/markdown.ts` MarkdownStore
 
 ### URL Hashing for Filenames
 
 - Use `createHash("sha256").update(url).digest("hex").slice(0, 16)` for deterministic, collision-resistant filenames
 - 16 hex chars (64 bits) sufficient for typical bookmark counts
-- Used in: `src/fetcher.ts` urlToHash()
+- Used in: `src/markdown.ts` urlToHash()
 
 ### LLM JSON Output
 
-- Request structured JSON from LLM with explicit format in prompt: `Respond with ONLY valid JSON in this exact format: {"field": "value"}`
-- LLM may wrap JSON in markdown code blocks, so extract with regex: `/```(?:json)?\s*([\s\S]*?)```/`
+- Use OpenAI's `response_format: { type: "json_object" }` to ensure valid JSON output
+- Still include explicit format in prompt: `Respond with ONLY valid JSON in this exact format: {"field": "value"}`
 - Validate structure and filter arrays for type safety (e.g., non-string tags)
 - Used in: `src/summarizer.ts` parseResponse()
 
@@ -144,7 +151,7 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 
 - In multi-step operations (fetch → summarize), save state after each successful step
 - Prevents inconsistent state on retry: if step 2 fails, step 1's result is already persisted
-- Used in: `src/cli/commands/process.ts` processOne()
+- Used in: `src/cli/commands/fetch.ts`, `src/cli/commands/summarize.ts`
 
 ### Interface Stability
 
