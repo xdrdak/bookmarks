@@ -25,9 +25,7 @@ describe("mainCommand", () => {
   });
 
   it("should throw when run without subcommand", async () => {
-    await expect(
-      runCommand(mainCommand, { rawArgs: [] }),
-    ).rejects.toThrow("No command specified");
+    await expect(runCommand(mainCommand, { rawArgs: [] })).rejects.toThrow("No command specified");
   });
 
   it("should render usage with correct description", async () => {

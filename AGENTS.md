@@ -88,3 +88,18 @@ This repository is a TypeScript/Node.js bookmarks tracking application using LLM
 - When validating, testing, or running commands locally, use: `npm start -- <command>`
   - Example: `npm start -- download -o output.csv`
   - The `--env-file=.env` flag is baked into the npm script
+
+## Patterns
+
+### Atomic File Writes
+
+- Write to temp file, then rename to target path
+- Prevents corrupted files on crash/interruption
+- Used in: `src/store.ts` BookmarkStore.save()
+
+### Spread Ordering for Type Inference
+
+- When merging partial data with required fields: `{...partial, requiredField: value}`
+- Spread first, required fields last - TypeScript knows required fields are always present
+- Avoids type assertions like `as MyType`
+- Used in: `src/store.ts` BookmarkStore.upsert()

@@ -61,9 +61,7 @@ export const downloadCommand: CommandDef<DownloadArgs> = {
         input: process.stdin,
         output: process.stdout,
       });
-      const answer = await rl.question(
-        `File "${output}" already exists. Overwrite? (y/N) `,
-      );
+      const answer = await rl.question(`File "${output}" already exists. Overwrite? (y/N) `);
       rl.close();
       const shouldOverwrite = answer.toLowerCase() === "y" || answer.toLowerCase() === "yes";
       if (!shouldOverwrite) {

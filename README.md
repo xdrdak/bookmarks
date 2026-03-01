@@ -40,6 +40,52 @@ bookmarks [command] [options]
 
 ---
 
+## Data Types
+
+### EnrichedBookmark
+
+Each bookmark in the store contains the following fields:
+
+| Field            | Type       | Required | Description                              |
+| ---------------- | ---------- | -------- | ---------------------------------------- |
+| `url`            | `string`   | Yes      | The URL (acts as unique key)             |
+| `addedAt`        | `string`   | Yes      | ISO timestamp when added to store        |
+| `summary`        | `string`   | No       | LLM-generated summary of page content    |
+| `tags`           | `string[]` | No       | LLM-generated tags for categorization    |
+| `read`           | `boolean`  | No       | Whether user has read/understood         |
+| `readAt`         | `string`   | No       | ISO timestamp when marked as read        |
+| `userNotes`      | `string`   | No       | User's personal notes                    |
+| `summarizedAt`   | `string`   | No       | ISO timestamp when summary was generated |
+| `summarizedWith` | `string`   | No       | LLM model used for summarization         |
+
+---
+
+## Storage
+
+The bookmark store is a JSON file (`bookmarks.json` by default) containing a map of URLs to enriched bookmark data.
+
+**Example structure:**
+
+```json
+{
+  "https://example.com/article": {
+    "url": "https://example.com/article",
+    "addedAt": "2026-02-23T00:00:00.000Z",
+    "summary": "An article about...",
+    "tags": ["ai", "productivity"],
+    "read": true,
+    "readAt": "2026-02-24T12:00:00.000Z",
+    "userNotes": "Great reference for X",
+    "summarizedAt": "2026-02-23T01:00:00.000Z",
+    "summarizedWith": "claude-3.5-sonnet"
+  }
+}
+```
+
+The store is managed by the `BookmarkStore` class in `src/store.ts`, which provides atomic writes and CRUD operations.
+
+---
+
 ## Commands
 
 ### Help
@@ -99,6 +145,8 @@ bookmarks download --force             # Overwrite without prompt
 src/
 ├── bin.ts              # CLI entry point
 ├── index.ts            # Public exports
+├── types.ts            # TypeScript type definitions
+├── store.ts            # BookmarkStore class for JSON persistence
 └── cli/
     ├── main.ts         # Main command definition
     ├── main.test.ts    # Tests for main command

@@ -28,9 +28,7 @@ describe("downloadCommand", () => {
 
   it("should have correct meta information", async () => {
     const meta =
-      typeof downloadCommand.meta === "function"
-        ? downloadCommand.meta()
-        : downloadCommand.meta;
+      typeof downloadCommand.meta === "function" ? downloadCommand.meta() : downloadCommand.meta;
     const resolvedMeta = meta instanceof Promise ? await meta : meta;
 
     expect(resolvedMeta?.name).toBe("download");
@@ -39,9 +37,7 @@ describe("downloadCommand", () => {
 
   it("should have correct args defined", async () => {
     const args =
-      typeof downloadCommand.args === "function"
-        ? downloadCommand.args()
-        : downloadCommand.args;
+      typeof downloadCommand.args === "function" ? downloadCommand.args() : downloadCommand.args;
     const resolvedArgs = args instanceof Promise ? await args : args;
 
     expect(resolvedArgs).toHaveProperty("output");
@@ -69,9 +65,7 @@ describe("downloadCommand", () => {
       throw new Error("process.exit");
     });
 
-    await expect(
-      runCommand(downloadCommand, { rawArgs: [] }),
-    ).rejects.toThrow("process.exit");
+    await expect(runCommand(downloadCommand, { rawArgs: [] })).rejects.toThrow("process.exit");
 
     expect(consoleSpy).toHaveBeenCalledWith(
       "Error: GOOGLE_SHEET_ID environment variable is not set",
@@ -90,9 +84,7 @@ describe("downloadCommand", () => {
       throw new Error("process.exit");
     });
 
-    await expect(
-      runCommand(downloadCommand, { rawArgs: [] }),
-    ).rejects.toThrow("process.exit");
+    await expect(runCommand(downloadCommand, { rawArgs: [] })).rejects.toThrow("process.exit");
 
     expect(consoleSpy).toHaveBeenCalledWith(
       "Error: GOOGLE_SHEET_GID environment variable is not set",
@@ -124,9 +116,7 @@ describe("downloadCommand", () => {
       "https://docs.google.com/spreadsheets/d/test-sheet-id/export?format=csv&gid=test-gid",
     );
     expect(existsSync(outputPath)).toBe(true);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Downloaded bookmarks to"),
-    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Downloaded bookmarks to"));
 
     consoleSpy.mockRestore();
     global.fetch = undefined;
@@ -176,9 +166,7 @@ describe("downloadCommand", () => {
       runCommand(downloadCommand, { rawArgs: ["--output", outputPath] }),
     ).rejects.toThrow("process.exit");
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("HTTP 404"),
-    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("HTTP 404"));
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();
@@ -206,9 +194,7 @@ describe("downloadCommand", () => {
       rawArgs: ["--output", outputPath, "--force"],
     });
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Downloaded bookmarks to"),
-    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Downloaded bookmarks to"));
 
     consoleSpy.mockRestore();
     global.fetch = undefined;
@@ -230,9 +216,7 @@ describe("downloadCommand", () => {
       runCommand(downloadCommand, { rawArgs: ["--output", outputPath] }),
     ).rejects.toThrow("process.exit");
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to fetch"),
-    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to fetch"));
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();
