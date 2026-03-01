@@ -29,11 +29,16 @@ export const helpCommand: CommandDef<HelpCommandArgs> = {
     if (commandName) {
       // Find the subcommand and show its usage
       const parentCmd = cmd;
-      const subCommands = parentCmd.subCommands
+      let subCommands = parentCmd.subCommands
         ? typeof parentCmd.subCommands === "function"
           ? parentCmd.subCommands()
           : parentCmd.subCommands
         : {};
+
+      // Await if subCommands is a promise
+      if (subCommands instanceof Promise) {
+        subCommands = await subCommands;
+      }
 
       // Get the subcommand (could be a promise or function)
       let subCommand = subCommands[commandName];

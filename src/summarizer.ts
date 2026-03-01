@@ -1,4 +1,10 @@
-import type { Summarizer } from "./types.ts";
+/**
+ * Interface for summarizing content.
+ */
+export interface Summarizer {
+  /** Generate a summary from content. */
+  summarize(content: string): Promise<string>;
+}
 
 /** Rate limit for Gemini free tier: ~15 RPM for Flash models = 4 seconds between requests */
 const DEFAULT_RATE_LIMIT_MS = 4_000;

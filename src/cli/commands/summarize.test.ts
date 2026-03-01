@@ -5,7 +5,7 @@ import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { BookmarkStore } from "../../store.ts";
 import { MarkdownStore, MarkdownFile } from "../../markdown.ts";
 import { summarizeCommand } from "./summarize.ts";
-import { LLMSummarizer } from "../../llm-summarizer.ts";
+import { LLMSummarizer } from "../../summarizer.ts";
 
 describe("summarizeCommand", () => {
   const originalEnv = { ...process.env };

@@ -1,7 +1,7 @@
 import type { ArgsDef, CommandDef } from "citty";
 import { BookmarkStore } from "../../store.ts";
 import { MarkdownStore } from "../../markdown.ts";
-import { LLMSummarizer } from "../../llm-summarizer.ts";
+import { LLMSummarizer } from "../../summarizer.ts";
 
 export interface SummarizeArgs extends ArgsDef {
   url: {
