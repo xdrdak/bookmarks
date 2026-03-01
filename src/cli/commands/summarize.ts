@@ -1,5 +1,5 @@
 import type { ArgsDef, CommandDef } from "citty";
-import { BookmarkStore } from "../../store.ts";
+import { BookmarkStore } from "../../bookmarks.ts";
 import { MarkdownStore } from "../../markdown.ts";
 import { LLMSummarizer } from "../../summarizer.ts";
 

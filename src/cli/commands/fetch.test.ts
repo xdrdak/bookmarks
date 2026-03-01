@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { runCommand } from "citty";
 import { join } from "node:path";
 import { existsSync, rmSync, mkdirSync } from "node:fs";
-import { BookmarkStore } from "../../store.ts";
+import { BookmarkStore } from "../../bookmarks.ts";
 import { MarkdownStore, MarkdownFetcher, MarkdownFile } from "../../markdown.ts";
 import { fetchCommand } from "./fetch.ts";
 

@@ -1,5 +1,5 @@
 import type { ArgsDef, CommandDef } from "citty";
-import { BookmarkStore } from "../../store.ts";
+import { BookmarkStore } from "../../bookmarks.ts";
 import { MarkdownFetcher, MarkdownStore } from "../../markdown.ts";
 
 export interface FetchArgs extends ArgsDef {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
 import { existsSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { BookmarkStore } from "./store.ts";
+import { BookmarkStore } from "./bookmarks.ts";
 
 describe("BookmarkStore", () => {
   const testDir = join(import.meta.dirname, "test-fixtures", "store");

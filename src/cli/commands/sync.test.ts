@@ -3,7 +3,7 @@ import { runCommand, renderUsage } from "citty";
 import { syncCommand } from "./sync.ts";
 import { join } from "node:path";
 import { existsSync, rmSync, mkdirSync, statSync } from "node:fs";
-import { BookmarkStore } from "../../store.ts";
+import { BookmarkStore } from "../../bookmarks.ts";
 
 describe("syncCommand", () => {
   const originalEnv = { ...process.env };
