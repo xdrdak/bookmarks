@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { RateLimiter } from "./rate-limiter.ts";
 
-/** Default rate limit for md.dhr.wtf: 5 requests per minute = 12 seconds between requests */
-const DEFAULT_RATE_LIMIT_MS = 12_000;
+/** Default rate limit for r.jina.ai: 20 requests per minute = 3 seconds between requests */
+const DEFAULT_RATE_LIMIT_MS = 3_000;
 
 /**
  * Convert a URL to a 16-character hash for use as a filename.
@@ -31,7 +31,7 @@ export class MarkdownFile {
 }
 
 /**
- * Fetches markdown content from URLs via md.dhr.wtf.
+ * Fetches markdown content from URLs via r.jina.ai.
  *
  * Returns MarkdownFile instances ready for storage.
  */
@@ -55,7 +55,7 @@ export class MarkdownFetcher {
     // Wait for rate limit before fetching
     await this.rateLimiter?.waitForNext();
 
-    const fetchUrl = `https://md.dhr.wtf/?url=${encodeURIComponent(url)}`;
+    const fetchUrl = `https://r.jina.ai/${url}`;
     const response = await fetch(fetchUrl);
 
     if (!response.ok) {

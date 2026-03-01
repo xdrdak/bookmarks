@@ -33,9 +33,7 @@ describe("MarkdownFetcher", () => {
       expect(result).toBeInstanceOf(MarkdownFile);
       expect(result.content).toBe(mockContent);
       expect(result.url).toBe(url);
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://md.dhr.wtf/?url=${encodeURIComponent(url)}`,
-      );
+      expect(global.fetch).toHaveBeenCalledWith(`https://r.jina.ai/${url}`);
     });
 
     it("should throw on HTTP error", async () => {
@@ -53,7 +51,7 @@ describe("MarkdownFetcher", () => {
       );
     });
 
-    it("should URL-encode the URL parameter", async () => {
+    it("should pass URL directly in path", async () => {
       const fetcher = new MarkdownFetcher(new RateLimiter(1));
       const url = "https://example.com/path?query=value&foo=bar";
 
@@ -64,9 +62,7 @@ describe("MarkdownFetcher", () => {
 
       await fetcher.fetch(url);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://md.dhr.wtf/?url=${encodeURIComponent(url)}`,
-      );
+      expect(global.fetch).toHaveBeenCalledWith(`https://r.jina.ai/${url}`);
     });
 
     it("should disable rate limiting when passed null", async () => {
